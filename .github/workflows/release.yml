@@ -91,7 +91,7 @@ jobs:
           for attempt in range(5):
               try:
                   rel = json.loads(subprocess.check_output(
-                      ["gh", "api", "-R", repo, f"releases/tags/{tag}"]))
+                      ["gh", "api", f"repos/{repo}/releases/tags/{tag}"]))
                   break
               except subprocess.CalledProcessError:
                   if attempt == 4:
