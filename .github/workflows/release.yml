@@ -40,8 +40,10 @@ jobs:
       - name: Prepare updater signing
         id: sign
         shell: bash
+        env:
+          SIGNING_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
         run: |
-          if [ -n "${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}" ]; then
+          if [ -n "$SIGNING_KEY" ]; then
             echo "has_key=true" >> $GITHUB_OUTPUT
           else
             echo "has_key=false" >> $GITHUB_OUTPUT
@@ -64,3 +66,66 @@ jobs:
           prerelease: false
           includeUpdaterArtifacts: true
           args: ${{ matrix.args }}
+
+  updater-manifest:
+    needs: build
+    if: ${{ always() && !contains(needs.build.result, 'failure') && !contains(needs.build.result, 'cancelled') }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Build latest.json from signed release assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -e
+          python3 - <<'PY'
+          import json, os, subprocess, urllib.request
+
+          repo = os.environ["GITHUB_REPOSITORY"]
+          tag = os.environ["TAG"]
+          ver = tag.lstrip("v")
+
+          rel = json.loads(subprocess.check_output(
+              ["gh", "api", f"repos/{repo}/releases/tags/{tag}"]))
+          assets = {a["name"]: a["browser_download_url"] for a in rel.get("assets", [])}
+
+          RULES = [
+              ("windows-x86_64", ("_x64-setup.zip", "_x64_en-US.msi.zip", "_x64.msi.zip")),
+              ("darwin-aarch64", ("aarch64.app.tar.gz",)),
+              ("darwin-x86_64", ("x64.app.tar.gz",)),
+              ("linux-x86_64", (".AppImage",)),
+          ]
+
+          platforms = {}
+          used = set()
+          for plat, suffixes in RULES:
+              for asset, url in assets.items():
+                  if asset.endswith(".sig") or asset in used:
+                      continue
+                  if any(asset.endswith(suf) for suf in suffixes):
+                      sig_name = asset + ".sig"
+                      if sig_name not in assets:
+                          print(f"::warning::{asset} has no .sig — skipped")
+                          continue
+                      sig = urllib.request.urlopen(url + ".sig").read().decode().strip()
+                      platforms[plat] = {"signature": sig, "url": url}
+                      used.update({asset, sig_name})
+                      break
+
+          if not platforms:
+              print("::warning::no signed updater assets found — skipping latest.json")
+              raise SystemExit(0)
+
+          manifest = {
+              "version": ver,
+              "notes": f"Immersio {ver}",
+              "pub_date": __import__("datetime").datetime.now(
+                  __import__("datetime").timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+              "platforms": platforms,
+          }
+          open("latest.json", "w").write(json.dumps(manifest, indent=2))
+          print(json.dumps(manifest, indent=2))
+          PY
+          gh release upload "$TAG" latest.json --clobber
