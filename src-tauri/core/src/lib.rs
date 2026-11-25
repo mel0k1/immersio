@@ -126,6 +126,16 @@ pub struct StreamInfo {
 pub struct LyricLine {
     pub time_ms: u32,
     pub text: String,
+    #[serde(default)]
+    pub words: Vec<LyricWord>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LyricWord {
+    pub text: String,
+    pub start_ms: u32,
+    pub end_ms: u32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

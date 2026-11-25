@@ -69,6 +69,9 @@ async fn parse(yt: &Yt, http: &Client, url: &str, hl: &str) -> Result<Parsed> {
     if url.contains("spotify.com") {
         return spotify(http, url).await;
     }
+    if url.contains("soundcloud.com") {
+        return soundcloud(http, url).await;
+    }
     if url.contains("deezer.com") || url.contains("page.link") {
         return deezer(http, url).await;
     }
@@ -249,4 +252,147 @@ pub async fn resolve(yt: &Yt, http: &Client, url: &str, hl: &str) -> Result<Impo
         return Err(CoreError::NotFound("matched tracks".into()));
     }
     Ok(ImportResult { kind: parsed.kind, name: parsed.name, tracks, failed })
+}
+
+static SC_CLIENT_ID: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+
+fn js_find_client_id(js: &str) -> Option<String> {
+    for marker in ["client_id:\"", "\"client_id\":\""] {
+        let mut search = js;
+        while let Some(i) = search.find(marker) {
+            let rest = &search[i + marker.len()..];
+            let id: String = rest.chars().take_while(|c| c.is_ascii_alphanumeric()).collect();
+            if (25..=40).contains(&id.len()) {
+                return Some(id);
+            }
+            search = rest;
+        }
+    }
+    None
+}
+
+async fn sc_client_id(http: &Client) -> Result<String> {
+    if let Some(id) = SC_CLIENT_ID.get() {
+        return Ok(id.clone());
+    }
+    let ua = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36";
+    let html = http
+        .get("https://soundcloud.com/")
+        .header("User-Agent", ua)
+        .send()
+        .await?
+        .error_for_status()?
+        .text()
+        .await?;
+    let mut assets = Vec::new();
+    let mut rest = html.as_str();
+    while let Some(i) = rest.find("https://a-v2.sndcdn.com/assets/") {
+        let tail = &rest[i..];
+        let end = tail.find('"').unwrap_or(tail.len());
+        let asset = &tail[..end];
+        if asset.ends_with(".js") {
+            assets.push(asset.to_string());
+        }
+        rest = &tail[end..];
+    }
+    let mut found = None;
+    for asset in assets.iter().rev().take(4) {
+        let Ok(js) = http
+            .get(asset)
+            .header("User-Agent", ua)
+            .send()
+            .await?
+            .error_for_status()?
+            .text()
+            .await
+        else {
+            continue;
+        };
+        if let Some(id) = js_find_client_id(&js) {
+            found = Some(id);
+            break;
+        }
+    }
+    let id = found.ok_or_else(|| CoreError::Blocked("soundcloud client_id".into()))?;
+    let _ = SC_CLIENT_ID.set(id.clone());
+    Ok(id)
+}
+
+async fn soundcloud(http: &Client, url: &str) -> Result<Parsed> {
+    let cid = sc_client_id(http).await?;
+    let val: Value = http
+        .get("https://api-v2.soundcloud.com/resolve")
+        .query(&[("url", url), ("client_id", cid.as_str())])
+        .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)")
+        .send()
+        .await?
+        .error_for_status()?
+        .json()
+        .await?;
+    let kind = val.get("kind").and_then(|x| x.as_str()).unwrap_or("").to_string();
+    let name = val
+        .get("title")
+        .and_then(|x| x.as_str())
+        .unwrap_or("SoundCloud")
+        .to_string();
+    let mut raw_tracks: Vec<Value> = match kind.as_str() {
+        "track" => vec![val],
+        "playlist" | "system-playlist" => val
+            .get("tracks")
+            .and_then(|x| x.as_array())
+            .cloned()
+            .unwrap_or_default(),
+        _ => return Err(CoreError::Parse("unsupported soundcloud link".into())),
+    };
+    // Search results and playlists often return stub entries (id only) — fetch full objects.
+    let stub_ids: Vec<String> = raw_tracks
+        .iter()
+        .filter(|t| t.get("title").and_then(|x| x.as_str()).is_none())
+        .filter_map(|t| t.get("id").and_then(|x| x.as_u64()))
+        .map(|i| i.to_string())
+        .collect();
+    if !stub_ids.is_empty() {
+        // The endpoint rejects large batches — fetch in chunks of 50 ids.
+        for chunk in stub_ids.chunks(50) {
+            let ids = chunk.join(",");
+            let full: Value = http
+                .get("https://api-v2.soundcloud.com/tracks")
+                .query(&[("ids", ids.as_str()), ("client_id", cid.as_str())])
+                .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)")
+                .send()
+                .await?
+                .error_for_status()?
+                .json()
+                .await?;
+            if let Some(arr) = full.as_array() {
+                raw_tracks.extend(arr.clone());
+            }
+        }
+    }
+    let mut to_match = Vec::new();
+    for t in raw_tracks {
+        let title = t.get("title").and_then(|x| x.as_str()).unwrap_or("").to_string();
+        if title.is_empty() {
+            continue;
+        }
+        let artist = t
+            .pointer("/publisher_metadata/artist")
+            .and_then(|x| x.as_str())
+            .or_else(|| t.pointer("/user/username").and_then(|x| x.as_str()))
+            .unwrap_or("")
+            .to_string();
+        let dur = t
+            .get("full_duration")
+            .or_else(|| t.get("duration"))
+            .and_then(|x| x.as_u64())
+            .map(|d| (d / 1000) as u32);
+        to_match.push(SourceTrack { title, artist, duration_secs: dur });
+        if to_match.len() >= MAX_TRACKS {
+            break;
+        }
+    }
+    if to_match.is_empty() {
+        return Err(CoreError::NotFound("soundcloud tracks".into()));
+    }
+    Ok(Parsed { kind: "soundcloud".into(), name, ready: Vec::new(), to_match })
 }

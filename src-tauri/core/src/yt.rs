@@ -542,6 +542,54 @@ impl Yt {
         Ok(val)
     }
 
+    pub async fn captions_urls(&self, video_id: &str) -> Vec<String> {
+        let url = format!("https://www.youtube.com/watch?v={video_id}&hl=en");
+        let html = match self
+            .http
+            .get(&url)
+            .header("Accept-Language", "en")
+            .send()
+            .await
+        {
+            Ok(r) => match r.text().await {
+                Ok(t) => t,
+                Err(_) => return Vec::new(),
+            },
+            Err(_) => return Vec::new(),
+        };
+        let marker = "\"captionTracks\":";
+        let Some(i) = html.find(marker) else {
+            return Vec::new();
+        };
+        let Some(start) = html[i..].find('[').map(|k| i + k) else {
+            return Vec::new();
+        };
+        let Some(end) = balanced(&html[start..]).map(|k| start + k) else {
+            return Vec::new();
+        };
+        let tracks: serde_json::Value = match serde_json::from_str(&html[start..end]) {
+            Ok(v) => v,
+            Err(_) => return Vec::new(),
+        };
+        let mut official = Vec::new();
+        let mut asr = Vec::new();
+        if let Some(arr) = tracks.as_array() {
+            for t in arr {
+                if let Some(u) = t.get("baseUrl").and_then(|x| x.as_str()) {
+                    if t.get("kind").and_then(|x| x.as_str()) == Some("asr") {
+                        asr.push(u.to_string());
+                    } else {
+                        official.push(u.to_string());
+                    }
+                }
+            }
+        }
+        let mut out = Vec::new();
+        out.extend(official.into_iter().take(2));
+        out.extend(asr.into_iter().take(1));
+        out
+    }
+
     pub async fn search(&self, query: &str, hl: &str) -> Result<SearchResults> {
         let val = self.post("search", json!({"query": query}), REMIX, hl).await?;
         let sections = val
@@ -1155,4 +1203,21 @@ fn parse_playlist(val: &Value, browse_id: &str) -> Result<BrowsePlaylist> {
         thumbs: header_thumbs(val),
         tracks,
     })
+}
+
+fn balanced(s: &str) -> Option<usize> {
+    let mut depth = 0usize;
+    for (i, c) in s.char_indices() {
+        match c {
+            '[' => depth += 1,
+            ']' => {
+                depth -= 1;
+                if depth == 0 {
+                    return Some(i + 1);
+                }
+            }
+            _ => {}
+        }
+    }
+    None
 }

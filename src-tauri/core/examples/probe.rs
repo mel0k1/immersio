@@ -69,8 +69,8 @@ async fn main() {
             }
             if let Some(t) = first_track {
                 let http = reqwest::Client::new();
-                match lyrics::fetch(&http, &t.title, &t.artists.join(", "), None, t.duration_secs).await {
-                    Ok(l) => println!("lyrics: synced={} plain={}", l.synced.len(), l.plain.is_some()),
+                match lyrics::fetch(&http, &t.title, &t.artists.join(", "), None, t.duration_secs, &[]).await {
+                    Ok(l) => println!("lyrics: synced={} plain={} words={}", l.synced.len(), l.plain.is_some(), l.synced.iter().filter(|x| !x.words.is_empty()).count()),
                     Err(e) => println!("lyrics err: {e}"),
                 }
                 println!("stream: {:?}", t.video_id);
