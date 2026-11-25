@@ -2,6 +2,7 @@ mod commands;
 mod stream;
 
 use commands::AppState;
+use tauri::Manager;
 
 fn main() {
     tauri::Builder::default()
@@ -15,9 +16,21 @@ fn main() {
                 client: None,
             }),
         })
-        .register_asynchronous_uri_scheme_protocol("stream", move |_ctx, request, responder| {
+        .setup(|app| {
+            if let Ok(dir) = app.path().app_data_dir() {
+                if let Ok(text) = std::fs::read_to_string(dir.join("yt-cookies.txt")) {
+                    let c = text.trim().to_string();
+                    if !c.is_empty() {
+                        app.state::<AppState>().yt.set_cookies(Some(c));
+                    }
+                }
+            }
+            Ok(())
+        })
+        .register_asynchronous_uri_scheme_protocol("stream", move |ctx, request, responder| {
+            let app = ctx.app_handle().clone();
             tauri::async_runtime::spawn(async move {
-                let response = stream::handle(request).await;
+                let response = stream::handle(&app, request).await;
                 responder.respond(response);
             });
         })
@@ -26,11 +39,16 @@ fn main() {
             commands::yt_browse,
             commands::yt_stream,
             commands::yt_radio,
+            commands::import_playlist,
             commands::lyrics_fetch,
             commands::fetch_image,
             commands::import_local,
             commands::scan_local_dir,
             commands::remove_local,
+            commands::yt_set_cookies,
+            commands::cache_stats,
+            commands::cache_clear,
+            commands::download_track,
             commands::app_version,
             commands::discord_update,
             commands::discord_clear,

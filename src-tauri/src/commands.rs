@@ -1,4 +1,4 @@
-use immersio_core::{Browse, LocalTrack, Lyrics, SearchResults, StreamInfo, TrackItem};
+use immersio_core::{Browse, importer::ImportResult, LocalTrack, Lyrics, SearchResults, StreamInfo, TrackItem};
 use std::fs;
 use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::Manager;
@@ -34,6 +34,74 @@ pub async fn yt_stream(state: State<'_, AppState>, video_id: String, hl: String,
 #[tauri::command]
 pub async fn yt_radio(state: State<'_, AppState>, video_id: String, hl: String) -> Result<Vec<TrackItem>, String> {
     state.yt.radio(&video_id, &hl).await.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn import_playlist(state: State<'_, AppState>, url: String, hl: String) -> Result<ImportResult, String> {
+    immersio_core::importer::resolve(&state.yt, &state.http, &url, &hl)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn yt_set_cookies(app: AppHandle, state: State<'_, AppState>, cookies: Option<String>) -> Result<(), String> {
+    state.yt.set_cookies(cookies.clone());
+    let dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    let path = dir.join("yt-cookies.txt");
+    match cookies.filter(|s| !s.trim().is_empty()) {
+        Some(c) => fs::write(&path, c.trim()).map_err(|e| e.to_string())?,
+        None => {
+            let _ = fs::remove_file(&path);
+        }
+    }
+    Ok(())
+}
+
+fn cache_dir_of(app: &AppHandle) -> Result<std::path::PathBuf, String> {
+    let dir = app.path().app_data_dir().map_err(|e| e.to_string())?.join("cache");
+    fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    Ok(dir)
+}
+
+#[tauri::command]
+pub fn cache_stats(app: AppHandle) -> Result<(u64, u64), String> {
+    let dir = cache_dir_of(&app)?;
+    let mut bytes = 0u64;
+    let mut count = 0u64;
+    if let Ok(entries) = fs::read_dir(&dir) {
+        for e in entries.filter_map(|e| e.ok()) {
+            if let Ok(meta) = e.metadata() {
+                if meta.is_file() {
+                    bytes += meta.len();
+                    count += 1;
+                }
+            }
+        }
+    }
+    Ok((bytes, count))
+}
+
+#[tauri::command]
+pub fn cache_clear(app: AppHandle) -> Result<(), String> {
+    let dir = cache_dir_of(&app)?;
+    if let Ok(entries) = fs::read_dir(&dir) {
+        for e in entries.filter_map(|e| e.ok()) {
+            let _ = fs::remove_file(e.path());
+        }
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn download_track(state: State<'_, AppState>, video_id: String, hl: String, path: String) -> Result<(), String> {
+    let info = state.yt.stream(&video_id, &hl, "high").await.map_err(|e| e.to_string())?;
+    let mut req = state.http.get(&info.url).header("User-Agent", "Mozilla/5.0");
+    if let Some(cookie) = state.yt.cookies() {
+        req = req.header("Cookie", cookie);
+    }
+    let bytes = req.send().await.map_err(|e| e.to_string())?.bytes().await.map_err(|e| e.to_string())?;
+    fs::write(&path, &bytes).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
