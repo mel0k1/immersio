@@ -19,7 +19,7 @@ function fmtSize(bytes: number): string {
 export function SettingsPage() {
   const t = useT();
   const {
-    lang, accent, setLang, setAccent, streamQuality, rate, radioAuto, discordId,
+    lang, accent, setLang, setAccent, theme, setTheme, streamQuality, rate, radioAuto, discordId,
     offlineCache, eqEnabled, eqGains,
     setStreamQuality, setRate, setRadioAuto, setDiscordId, setOfflineCache, setEqEnabled, setEqGains,
   } = useSettings();
@@ -75,6 +75,17 @@ export function SettingsPage() {
                   {ACCENTS.map((c) => (
                     <button key={c} className={`swatch${accent === c ? " active" : ""}`} style={{ background: c }} onClick={() => setAccent(c)} />
                   ))}
+                </div>
+              </div>
+              <div className="settings-row">
+                <div className="settings-label">{t("theme")}</div>
+                <div className="seg">
+                  <button className={theme === "dark" ? "active" : ""} onClick={() => setTheme("dark")}>
+                    {t("themeDark")}
+                  </button>
+                  <button className={theme === "light" ? "active" : ""} onClick={() => setTheme("light")}>
+                    {t("themeLight")}
+                  </button>
                 </div>
               </div>
             </>
@@ -244,7 +255,7 @@ export function SettingsPage() {
                 <div>
                   <div style={{ fontSize: 17, fontWeight: 750 }}>Immersio</div>
                   <div style={{ color: "var(--text-dim)", fontSize: 13 }}>
-                    {t("version")} {version || "0.3.0"}
+                    {t("version")} {version || "0.4.0"}
                   </div>
                 </div>
               </div>

@@ -74,9 +74,16 @@ export interface StreamInfo {
   durationMs: number | null;
 }
 
+export interface LyricWord {
+  text: string;
+  startMs: number;
+  endMs: number;
+}
+
 export interface LyricLine {
   timeMs: number;
   text: string;
+  words: LyricWord[];
 }
 
 export interface Lyrics {

@@ -8,6 +8,7 @@ import { tKey } from "./i18n";
 interface SettingsState {
   lang: "ru" | "en";
   accent: string;
+  theme: "dark" | "light";
   streamQuality: "high" | "low";
   rate: number;
   lyricsOffsetMs: number;
@@ -18,6 +19,7 @@ interface SettingsState {
   eqGains: number[];
   setLang: (l: "ru" | "en") => void;
   setAccent: (a: string) => void;
+  setTheme: (t: "dark" | "light") => void;
   setStreamQuality: (q: "high" | "low") => void;
   setRate: (r: number) => void;
   setLyricsOffset: (ms: number) => void;
@@ -33,6 +35,7 @@ export const useSettings = create<SettingsState>()(
     (set) => ({
       lang: "ru",
       accent: "#7c5cff",
+      theme: "dark",
       streamQuality: "high",
       rate: 1,
       lyricsOffsetMs: 0,
@@ -43,6 +46,7 @@ export const useSettings = create<SettingsState>()(
       eqGains: [0, 0, 0, 0, 0],
       setLang: (lang) => set({ lang }),
       setAccent: (accent) => set({ accent }),
+      setTheme: (theme) => set({ theme }),
       setStreamQuality: (streamQuality) => set({ streamQuality }),
       setRate: (rate) => set({ rate }),
       setLyricsOffset: (lyricsOffsetMs) => set({ lyricsOffsetMs }),

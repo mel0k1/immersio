@@ -181,11 +181,16 @@ function DropOverlay() {
 
 function Shell() {
   const accent = useSettings((s) => s.accent);
+  const theme = useSettings((s) => s.theme);
   const queueOpen = usePlayer((s) => s.queueOpen);
 
   useEffect(() => {
     document.documentElement.style.setProperty("--accent", accent);
   }, [accent]);
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+  }, [theme]);
 
   useEffect(() => {
     bindEngine();

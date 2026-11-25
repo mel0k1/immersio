@@ -6,14 +6,63 @@ import { useLibrary, usePlayer, useSettings } from "../lib/store";
 import { useT } from "../lib/i18n";
 import { fmtTime, hexToRgb } from "../lib/format";
 import { Cover } from "./Cover";
+import { engine } from "../lib/audio";
 import type { CSSProperties } from "react";
-import type { Lyrics } from "../types";
+import type { LyricLine, LyricWord, Lyrics } from "../types";
 
 const RATES = [0.75, 1, 1.25, 1.5, 2];
 
 function fill(v: number, max: number): CSSProperties {
   const pct = max > 0 ? Math.min(100, (v / max) * 100) : 0;
   return { "--fill": `${pct}%` } as CSSProperties;
+}
+
+function interpolateWords(line: LyricLine, nextTime: number): LyricWord[] {
+  const toks = line.text.split(/\s+/).filter(Boolean);
+  if (!toks.length) return [];
+  const end = Math.max(nextTime - 50, line.timeMs + toks.length * 120);
+  const total = toks.reduce((a, w) => a + w.length, 0) || 1;
+  const span = end - line.timeMs;
+  let acc = line.timeMs;
+  return toks.map((w) => {
+    const share = (w.length / total) * span;
+    const start = acc;
+    acc += share;
+    return { text: w, startMs: start, endMs: acc };
+  });
+}
+
+function KaraokeLine({ line, nextTime, offset }: { line: LyricLine; nextTime: number; offset: number }) {
+  const [, tick] = useState(0);
+  useEffect(() => {
+    let raf = 0;
+    const loop = () => {
+      tick((x) => x + 1);
+      raf = requestAnimationFrame(loop);
+    };
+    raf = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(raf);
+  }, []);
+  const ms = engine.position() * 1000 + offset;
+  const words = line.words.length > 0 ? line.words : interpolateWords(line, nextTime);
+  return (
+    <>
+      {words.map((w, i) => {
+        const pct = ms <= w.startMs ? 0 : ms >= w.endMs ? 100 : ((ms - w.startMs) / Math.max(1, w.endMs - w.startMs)) * 100;
+        const filling = pct > 0 && pct < 100;
+        return (
+          <span key={i} className={`lyr-word${pct >= 100 ? " done" : ""}`}>
+            {w.text}
+            {filling && (
+              <span className="lyr-fill" style={{ width: `${pct}%` }}>
+                {w.text}
+              </span>
+            )}
+          </span>
+        );
+      })}
+    </>
+  );
 }
 
 export function Fullscreen() {
@@ -56,7 +105,7 @@ export function Fullscreen() {
     if (!track.videoId) return;
     let alive = true;
     api
-      .lyrics(track.title, track.artists.join(", "), track.album ?? null, track.durationSecs ?? null)
+      .lyrics(track.title, track.artists.join(", "), track.album ?? null, track.durationSecs ?? null, track.videoId ?? null)
       .then((l) => alive && setLyrics(l))
       .catch(() => alive && setLyricsFail(true));
     return () => {
@@ -194,7 +243,11 @@ export function Fullscreen() {
                 className={`lyrics-line${i === activeLine ? " active" : ""}`}
                 onClick={() => seek(l.timeMs / 1000)}
               >
-                {l.text}
+                {i === activeLine ? (
+                  <KaraokeLine line={l} nextTime={lyrics.synced[i + 1]?.timeMs ?? l.timeMs + 4000} offset={lyricsOffsetMs} />
+                ) : (
+                  l.text
+                )}
               </div>
             ))
           ) : lyrics?.plain ? (

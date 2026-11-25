@@ -12,8 +12,8 @@ export const api = {
     invoke<TrackItem[]>("yt_radio", { videoId, hl }),
   importPlaylist: (url: string, hl: string) =>
     invoke<ImportResult>("import_playlist", { url, hl }),
-  lyrics: (track: string, artist: string, album: string | null, duration: number | null) =>
-    invoke<Lyrics>("lyrics_fetch", { track, artist, album, duration }),
+  lyrics: (track: string, artist: string, album: string | null, duration: number | null, videoId: string | null) =>
+    invoke<Lyrics>("lyrics_fetch", { track, artist, album, duration, videoId }),
   fetchImage: (url: string) => invoke<number[]>("fetch_image", { url }),
   importLocal: (paths: string[]) => invoke<LocalTrack[]>("import_local", { paths }),
   scanLocalDir: (dir: string) => invoke<string[]>("scan_local_dir", { dir }),
