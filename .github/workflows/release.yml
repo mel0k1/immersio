@@ -88,11 +88,11 @@ jobs:
           ver = tag.lstrip("v")
 
           rel = json.loads(subprocess.check_output(
-              ["gh", "api", f"repos/{repo}/releases/tags/{tag}"]))
+              ["gh", "api", "-R", repo, f"releases/tags/{tag}"]))
           assets = {a["name"]: a["browser_download_url"] for a in rel.get("assets", [])}
 
           RULES = [
-              ("windows-x86_64", ("_x64-setup.zip", "_x64_en-US.msi.zip", "_x64.msi.zip")),
+              ("windows-x86_64", ("_x64-setup.exe", "_x64_en-US.msi")),
               ("darwin-aarch64", ("aarch64.app.tar.gz",)),
               ("darwin-x86_64", ("x64.app.tar.gz",)),
               ("linux-x86_64", (".AppImage",)),
@@ -128,4 +128,4 @@ jobs:
           open("latest.json", "w").write(json.dumps(manifest, indent=2))
           print(json.dumps(manifest, indent=2))
           PY
-          gh release upload "$TAG" latest.json --clobber
+          gh release upload -R "$GITHUB_REPOSITORY" "$TAG" latest.json --clobber
