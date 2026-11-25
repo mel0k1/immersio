@@ -47,6 +47,7 @@ const REMIX: usize = 3;
 pub struct Yt {
     http: Client,
     visitor: std::sync::Arc<RwLock<Option<String>>>,
+    cookies: std::sync::Arc<RwLock<Option<String>>>,
 }
 
 fn pick_thumbs(v: &Value) -> Vec<Thumb> {
@@ -361,7 +362,7 @@ fn parse_two_row(row: &Value, hint: ItemKind) -> Option<CollectionItem> {
 fn fix_video_title(t: &mut TrackItem) {
     if let Some(pos) = t.title.find(" — ") {
         let mut artist = t.title[..pos].trim().to_string();
-        let rest = t.title[pos + 3..].trim().to_string();
+        let rest = t.title[pos + " — ".len()..].trim().to_string();
         if let Some(cp) = artist.rfind(", ") {
             let tail = artist[cp + 2..].to_lowercase();
             if tail.contains("просмотр") || tail.contains("view") {
@@ -478,7 +479,18 @@ impl Yt {
         Self {
             http,
             visitor: std::sync::Arc::new(RwLock::new(None)),
+            cookies: std::sync::Arc::new(RwLock::new(None)),
         }
+    }
+
+    pub fn set_cookies(&self, cookies: Option<String>) {
+        if let Ok(mut guard) = self.cookies.write() {
+            *guard = cookies.filter(|s| !s.trim().is_empty());
+        }
+    }
+
+    pub fn cookies(&self) -> Option<String> {
+        self.cookies.read().ok().and_then(|g| g.clone())
     }
 
     fn context(&self, idx: usize, hl: &str) -> Value {
@@ -510,16 +522,17 @@ impl Yt {
         if let Some(obj) = body.as_object_mut() {
             obj.insert("context".into(), self.context(idx, hl));
         }
-        let resp = self
+        let mut req = self
             .http
             .post(format!("{API}/{endpoint}?prettyPrint=false"))
             .header("Content-Type", "application/json")
             .header("User-Agent", c.ua)
             .header("X-YouTube-Client-Name", client_name_num(c.name))
-            .header("X-YouTube-Client-Version", c.version)
-            .json(&body)
-            .send()
-            .await?;
+            .header("X-YouTube-Client-Version", c.version);
+        if let Some(cookie) = self.cookies() {
+            req = req.header("Cookie", cookie);
+        }
+        let resp = req.json(&body).send().await?;
         let val: Value = resp.json().await?;
         if let Some(vd) = val.pointer("/responseContext/visitorData").and_then(|x| x.as_str()) {
             if let Ok(mut guard) = self.visitor.write() {

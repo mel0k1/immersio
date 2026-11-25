@@ -150,6 +150,7 @@ pub struct LocalTrack {
     pub cover_path: Option<String>,
 }
 
+pub mod importer;
 pub mod lyrics;
 pub mod local;
 pub mod yt;

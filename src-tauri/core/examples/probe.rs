@@ -4,6 +4,24 @@ use immersio_core::yt::Yt;
 #[tokio::main]
 async fn main() {
     let yt = Yt::new();
+    let http = reqwest::Client::new();
+    if let Some(url) = std::env::args().nth(2) {
+        match immersio_core::importer::resolve(&yt, &http, &url, "ru").await {
+            Ok(r) => println!(
+                "import ok [{}]: {} — {} tracks (failed {}), first: {}",
+                r.kind,
+                r.name,
+                r.tracks.len(),
+                r.failed,
+                r.tracks
+                    .first()
+                    .map(|t| format!("{} — {}", t.artists.join(", "), t.title))
+                    .unwrap_or_default()
+            ),
+            Err(e) => println!("import err: {e}"),
+        }
+        return;
+    }
     let q = std::env::args().nth(1).unwrap_or_else(|| "kai angel".into());
     match yt.search(&q, "ru").await {
         Ok(res) => {
