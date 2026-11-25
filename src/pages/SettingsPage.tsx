@@ -1,16 +1,48 @@
 import { useEffect, useState } from "react";
-import { Palette, SlidersHorizontal, Info } from "lucide-react";
+import { Keyboard, Palette, SlidersHorizontal, Info } from "lucide-react";
 import { check, type Update } from "@tauri-apps/plugin-updater";
 import { relaunch } from "@tauri-apps/plugin-process";
-import { useSettings, useLibrary, useUi } from "../lib/store";
+import { useSettings, useLibrary, useUi, DEFAULT_SHORTCUTS, type Locale } from "../lib/store";
 import { useT } from "../lib/i18n";
 import { api } from "../lib/ipc";
+import { comboOf, comboLabel } from "../lib/shortcuts";
 import { EQ_FREQS } from "../lib/audio";
 
-const ACCENTS = ["#7c5cff", "#ff5c7c", "#3ecf8e", "#4d71ff", "#ffb020", "#e8e8ee"];
+const ACCENTS = ["#7c5cff", "#ff5c7c", "#3ecf8e", "#4d71ff", "#2dd4bf", "#f97316", "#a78bfa", "#ef4444", "#38bdf8", "#84cc16", "#e879f9", "#ffb020", "#e8e8ee"];
 
-const TABS = ["appearance", "playback", "about"] as const;
+const LANGS: [Locale, string][] = [
+  ["ru", "Русский"],
+  ["en", "English"],
+  ["uk", "Українська"],
+  ["es", "Español"],
+  ["de", "Deutsch"],
+  ["it", "Italiano"],
+  ["fr", "Français"],
+  ["pl", "Polski"],
+  ["tr", "Türkçe"],
+  ["pt", "Português"],
+  ["id", "Indonesia"],
+];
+
+const TABS = ["appearance", "playback", "shortcuts", "about"] as const;
 type Tab = (typeof TABS)[number];
+
+const ACTIONS: [string, string][] = [
+  ["playPause", "scPlayPause"],
+  ["nextTrack", "scNext"],
+  ["prevTrack", "scPrev"],
+  ["seekForward", "scSeekForward"],
+  ["seekBackward", "scSeekBackward"],
+  ["volumeUp", "scVolumeUp"],
+  ["volumeDown", "scVolumeDown"],
+  ["toggleMute", "scMute"],
+  ["toggleFullscreen", "scFullscreen"],
+  ["likeTrack", "scLike"],
+  ["toggleQueue", "scQueue"],
+  ["openSearch", "scSearch"],
+];
+
+const CACHE_OPTIONS = [1, 3, 10, 0];
 
 function fmtSize(bytes: number): string {
   if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
@@ -21,9 +53,10 @@ function fmtSize(bytes: number): string {
 export function SettingsPage() {
   const t = useT();
   const {
-    lang, accent, setLang, setAccent, theme, setTheme, glass, setGlass, streamQuality, rate, pitchLock, radioAuto,
-    discordOn, discordId, offlineCache, eqEnabled, eqGains,
-    setStreamQuality, setRate, setPitchLock, setRadioAuto, setDiscordOn, setDiscordId, setOfflineCache, setEqEnabled, setEqGains,
+    lang, accent, setLang, setAccent, theme, setTheme, glass, setGlass, ambient, setAmbient, streamQuality, rate, pitchLock, radioAuto,
+    discordOn, discordId, offlineCache, cacheLimit, pauseOnDeviceChange, shortcuts, eqEnabled, eqGains,
+    setStreamQuality, setRate, setPitchLock, setRadioAuto, setDiscordOn, setDiscordId, setOfflineCache, setCacheLimit,
+    setPauseOnDeviceChange, setShortcut, resetShortcuts, setEqEnabled, setEqGains,
   } = useSettings();
   const showToast = useUi((s) => s.showToast);
   const clearAll = useLibrary((s) => s.clearAll);
@@ -32,6 +65,7 @@ export function SettingsPage() {
   const [cookieInput, setCookieInput] = useState("");
   const [cacheInfo, setCacheInfo] = useState<[number, number] | null>(null);
   const [tab, setTab] = useState<Tab>("appearance");
+  const [recording, setRecording] = useState<string | null>(null);
   const [updState, setUpdState] = useState<null | "checking" | "none" | "error" | "downloading" | "installed" | Update>(null);
 
   async function checkForUpdate() {
@@ -61,6 +95,34 @@ export function SettingsPage() {
     api.cacheStats().then(setCacheInfo).catch(() => undefined);
   }, []);
 
+  useEffect(() => {
+    if (!recording) {
+      delete document.body.dataset.recording;
+      return;
+    }
+    document.body.dataset.recording = "1";
+    const onKey = (e: KeyboardEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (e.code === "Escape") {
+        setRecording(null);
+        return;
+      }
+      const combo = comboOf(e);
+      if (!combo) return;
+      const clash = Object.entries(shortcuts).find(([a, c]) => a !== recording && c === combo);
+      if (clash) {
+        showToast(`${t("shortcutTaken")}: ${comboLabel(combo)}`);
+        setRecording(null);
+        return;
+      }
+      setShortcut(recording, combo);
+      setRecording(null);
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [recording]);
+
   return (
     <div className="page">
       <h1 className="page-title">{t("settings")}</h1>
@@ -74,6 +136,10 @@ export function SettingsPage() {
             <SlidersHorizontal size={15} style={{ marginRight: 8, verticalAlign: -2 }} />
             {t("playback")}
           </button>
+          <button className={`settings-nav-item${tab === "shortcuts" ? " active" : ""}`} onClick={() => setTab("shortcuts")}>
+            <Keyboard size={15} style={{ marginRight: 8, verticalAlign: -2 }} />
+            {t("shortcuts")}
+          </button>
           <button className={`settings-nav-item${tab === "about" ? " active" : ""}`} onClick={() => setTab("about")}>
             <Info size={15} style={{ marginRight: 8, verticalAlign: -2 }} />
             {t("about")}
@@ -83,16 +149,13 @@ export function SettingsPage() {
           {tab === "appearance" && (
             <>
               <div className="settings-row">
-                <div>
-                  <div className="settings-label">{t("language")}</div>
-                </div>
-                <div className="seg">
-                  <button className={lang === "ru" ? "active" : ""} onClick={() => setLang("ru")}>
-                    Русский
-                  </button>
-                  <button className={lang === "en" ? "active" : ""} onClick={() => setLang("en")}>
-                    English
-                  </button>
+                <div className="settings-label">{t("language")}</div>
+                <div className="swatches" style={{ justifyContent: "flex-end" }}>
+                  {LANGS.map(([code, name]) => (
+                    <button key={code} className={`pill${lang === code ? " active" : ""}`} onClick={() => setLang(code)}>
+                      {name}
+                    </button>
+                  ))}
                 </div>
               </div>
               <div className="settings-row">
@@ -124,6 +187,15 @@ export function SettingsPage() {
                     {t("glassOff")}
                   </button>
                 </div>
+              </div>
+              <div className="settings-row">
+                <div>
+                  <div className="settings-label">{t("ambient")}</div>
+                  <div className="settings-desc">{t("ambientDesc")}</div>
+                </div>
+                <button className={`btn${ambient ? " accent" : ""}`} onClick={() => setAmbient(!ambient)}>
+                  {ambient ? "ON" : "OFF"}
+                </button>
               </div>
             </>
           )}
@@ -174,6 +246,28 @@ export function SettingsPage() {
                     {offlineCache ? "ON" : "OFF"}
                   </button>
                 </div>
+              </div>
+              <div className="settings-row">
+                <div>
+                  <div className="settings-label">{t("cacheLimit")}</div>
+                  <div className="settings-desc">{t("cacheLimitDesc")}</div>
+                </div>
+                <div className="seg">
+                  {CACHE_OPTIONS.map((gb) => (
+                    <button key={gb} className={cacheLimit === gb * 1073741824 ? "active" : ""} onClick={() => setCacheLimit(gb * 1073741824)}>
+                      {gb === 0 ? t("cacheUnlimited") : `${gb} GB`}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="settings-row">
+                <div>
+                  <div className="settings-label">{t("devicePause")}</div>
+                  <div className="settings-desc">{t("devicePauseDesc")}</div>
+                </div>
+                <button className={`btn${pauseOnDeviceChange ? " accent" : ""}`} onClick={() => setPauseOnDeviceChange(!pauseOnDeviceChange)}>
+                  {pauseOnDeviceChange ? "ON" : "OFF"}
+                </button>
               </div>
               <div className="settings-row">
                 <div>
@@ -284,12 +378,6 @@ export function SettingsPage() {
               )}
               <div className="settings-row">
                 <div>
-                  <div className="settings-label">{t("shortcuts")}</div>
-                  <div className="settings-desc">{t("shortcutsDesc")}</div>
-                </div>
-              </div>
-              <div className="settings-row">
-                <div>
                   <div className="settings-label">{t("clearData")}</div>
                   <div className="settings-desc">{t("clearDataDesc")}</div>
                 </div>
@@ -303,6 +391,31 @@ export function SettingsPage() {
                   {t("clearData")}
                 </button>
               </div>
+            </>
+          )}
+          {tab === "shortcuts" && (
+            <>
+              <div className="settings-row">
+                <div>
+                  <div className="settings-label">{t("shortcuts")}</div>
+                  <div className="settings-desc">{t("shortcutsRecDesc")}</div>
+                </div>
+                <button className="btn" onClick={resetShortcuts}>
+                  {t("resetShortcuts")}
+                </button>
+              </div>
+              {ACTIONS.map(([action, key]) => (
+                <div className="settings-row" key={action}>
+                  <div className="settings-label">{t(key)}</div>
+                  <button
+                    className={`pill${recording === action ? " active" : ""}`}
+                    style={{ minWidth: 130, textAlign: "center" }}
+                    onClick={() => setRecording(recording === action ? null : action)}
+                  >
+                    {recording === action ? t("pressKey") : comboLabel(shortcuts[action] || DEFAULT_SHORTCUTS[action] || "")}
+                  </button>
+                </div>
+              ))}
             </>
           )}
           {tab === "about" && (

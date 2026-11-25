@@ -1,4 +1,8 @@
 import { useSettings } from "./store";
+import { LOCALES } from "./locales";
+import type { Locale } from "./locales";
+
+export type { Locale };
 
 type Dict = Record<string, string>;
 
@@ -141,6 +145,29 @@ const ru: Dict = {
   pitchLock: "Сохранять тон",
   pitchLockDesc: "Тон не меняется при ускорении или замедлении",
   discordIdDesc: "Rich Presence работает сразу; здесь можно указать ID своего приложения Discord",
+  ambient: "Живой фон",
+  ambientDesc: "Анимированный фон из обложки в полном плеере",
+  cacheLimit: "Лимит кэша",
+  cacheLimitDesc: "Старые файлы вытесняются при превышении",
+  cacheUnlimited: "Без лимита",
+  devicePause: "Пауза при смене устройства",
+  devicePauseDesc: "Останавливает воспроизведение при подключении нового аудиоустройства",
+  shortcutTaken: "Занято другим действием",
+  shortcutsRecDesc: "Нажми на сочетание и задай новую клавишу; Escape — отмена",
+  resetShortcuts: "Сбросить",
+  pressKey: "Нажми клавишу…",
+  scPlayPause: "Пауза / продолжить",
+  scNext: "Следующий трек",
+  scPrev: "Предыдущий трек",
+  scSeekForward: "Перемотка вперёд",
+  scSeekBackward: "Перемотка назад",
+  scVolumeUp: "Громче",
+  scVolumeDown: "Тише",
+  scMute: "Без звука",
+  scFullscreen: "Полный экран",
+  scLike: "Лайк",
+  scQueue: "Очередь",
+  scSearch: "Поиск",
 };
 
 const en: Dict = {
@@ -282,10 +309,33 @@ const en: Dict = {
   pitchLock: "Preserve pitch",
   pitchLockDesc: "Keeps the pitch unchanged at higher or lower speed",
   discordIdDesc: "Rich Presence works out of the box; set your own Discord application ID here to override",
+  ambient: "Ambient background",
+  ambientDesc: "Animated cover-art background in the fullscreen player",
+  cacheLimit: "Cache limit",
+  cacheLimitDesc: "Oldest files are evicted once the limit is reached",
+  cacheUnlimited: "No limit",
+  devicePause: "Pause on device change",
+  devicePauseDesc: "Stops playback when a new audio device is connected",
+  shortcutTaken: "Already used by another action",
+  shortcutsRecDesc: "Click a binding and press a new key; Escape cancels",
+  resetShortcuts: "Reset",
+  pressKey: "Press a key…",
+  scPlayPause: "Play / pause",
+  scNext: "Next track",
+  scPrev: "Previous track",
+  scSeekForward: "Seek forward",
+  scSeekBackward: "Seek backward",
+  scVolumeUp: "Volume up",
+  scVolumeDown: "Volume down",
+  scMute: "Mute",
+  scFullscreen: "Fullscreen",
+  scLike: "Like",
+  scQueue: "Queue",
+  scSearch: "Search",
 };
 
-export function tKey(lang: "ru" | "en", key: string): string {
-  return (lang === "ru" ? ru : en)[key] ?? key;
+export function tKey(lang: Locale, key: string): string {
+  return LOCALES[lang]?.[key] ?? en[key] ?? ru[key] ?? key;
 }
 
 export function useT() {

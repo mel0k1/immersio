@@ -20,6 +20,49 @@ function loadHistory(): string[] {
   }
 }
 
+function normText(s: string): string[] {
+  return s
+    .toLowerCase()
+    .replace(/[(\[{].*?[)\]}]/g, " ")
+    .replace(/[^a-zа-яё0-9]+/gi, " ")
+    .split(" ")
+    .filter(Boolean);
+}
+
+function sim(a: string, b: string): number {
+  const A = new Set(normText(a));
+  const B = new Set(normText(b));
+  if (!A.size || !B.size) return 0;
+  let inter = 0;
+  for (const x of A) if (B.has(x)) inter++;
+  return inter / Math.max(A.size, B.size);
+}
+
+function isSameTrack(yt: TrackItem, sc: TrackItem): boolean {
+  if (sim(yt.title, sc.title) < 0.6) return false;
+  if (yt.artists.some((a) => sc.artists.some((b) => sim(a, b) >= 0.5))) return true;
+  return sim(yt.artists.join(" "), sc.artists.join(" ")) >= 0.5;
+}
+
+function mergeTracks(yt: TrackItem[], sc: TrackItem[]): TrackItem[] {
+  const fresh: TrackItem[] = [];
+  const seen = new Set<string>();
+  for (const t of sc) {
+    if (seen.has(t.videoId)) continue;
+    if (yt.some((y) => isSameTrack(y, t))) continue;
+    seen.add(t.videoId);
+    fresh.push(t);
+  }
+  const out: TrackItem[] = [];
+  let k = 0;
+  yt.forEach((t, i) => {
+    out.push(t);
+    if ((i + 1) % 2 === 0 && k < fresh.length) out.push(fresh[k++]);
+  });
+  while (k < fresh.length) out.push(fresh[k++]);
+  return out;
+}
+
 export function SearchPage() {
   const t = useT();
   const nav = useNavigate();
@@ -85,6 +128,8 @@ export function SearchPage() {
     return out;
   };
   const queueOf = (kind: "track" | "video") => tracksOf(kind).map(playableOf);
+  const merged = mergeTracks(tracksOf("track"), scTracks);
+  const mergedQueue = merged.map(playableOf);
 
   return (
     <div className="page">
@@ -125,10 +170,10 @@ export function SearchPage() {
           {loading && <div className="state-block"><span className="spin" /></div>}
           {!loading && (
             <>
-              {(tab === "all" || tab === "track") && tracksOf("track").length > 0 && (
+              {(tab === "all" || tab === "track") && merged.length > 0 && (
                 <div className="track-list" style={{ marginTop: 10 }}>
-                  {tracksOf("track").slice(0, tab === "all" ? 5 : undefined).map((tr, i) => (
-                    <TrackRow key={tr.videoId} raw={tr} track={playableOf(tr)} index={i} queue={queueOf("track")} />
+                  {merged.slice(0, tab === "all" ? 8 : undefined).map((tr, i) => (
+                    <TrackRow key={tr.videoId} raw={tr} track={playableOf(tr)} index={i} queue={mergedQueue} />
                   ))}
                 </div>
               )}
@@ -181,28 +226,19 @@ export function SearchPage() {
                   ))}
                 </div>
               )}
-              {(tab === "all" || tab === "soundcloud") && scTracks.length > 0 && (
-                <>
-                  {tab === "all" && <div className="section-title" style={{ marginTop: 20 }}>{t("soundcloud")}</div>}
-                  <div className="track-list" style={{ marginTop: tab === "all" ? 10 : 10 }}>
-                    {scTracks.slice(0, tab === "all" ? 3 : undefined).map((tr, i) => (
-                      <TrackRow key={tr.videoId} raw={tr} track={playableOf(tr)} index={i} queue={scTracks.map(playableOf)} />
-                    ))}
-                  </div>
-                  {tab === "all" && scTracks.length > 3 && (
-                    <button className="pill" style={{ marginTop: 12 }} onClick={() => setTab("soundcloud")}>
-                      {t("soundcloud")} · {scTracks.length}
-                    </button>
-                  )}
-                </>
+              {tab === "soundcloud" && scTracks.length > 0 && (
+                <div className="track-list" style={{ marginTop: 10 }}>
+                  {scTracks.map((tr, i) => (
+                    <TrackRow key={tr.videoId} raw={tr} track={playableOf(tr)} index={i} queue={scTracks.map(playableOf)} />
+                  ))}
+                </div>
               )}
               {!loading &&
-                tracksOf("track").length === 0 &&
+                merged.length === 0 &&
                 tracksOf("video").length === 0 &&
                 collectionsOf("album").length === 0 &&
                 collectionsOf("artist").length === 0 &&
-                collectionsOf("playlist").length === 0 &&
-                scTracks.length === 0 && <div className="state-block">{t("emptySearch")}</div>}
+                collectionsOf("playlist").length === 0 && <div className="state-block">{t("emptySearch")}</div>}
             </>
           )}
         </>

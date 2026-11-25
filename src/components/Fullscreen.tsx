@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown, Heart, Pause, Play, Repeat, Repeat1, Shuffle, SkipBack, SkipForward, Volume1, Volume2, VolumeX } from "lucide-react";
 import { api } from "../lib/ipc";
 import { dominantColor, imageBlobUrl } from "../lib/cover";
@@ -6,6 +6,7 @@ import { useLibrary, usePlayer, useSettings } from "../lib/store";
 import { useT } from "../lib/i18n";
 import { fmtTime, hexToRgb } from "../lib/format";
 import { Cover } from "./Cover";
+import { Ambient } from "./Ambient";
 import { WindowControls } from "./WindowControls";
 import { engine } from "../lib/audio";
 import type { CSSProperties } from "react";
@@ -79,7 +80,9 @@ export function Fullscreen() {
   const repeat = usePlayer((s) => s.repeat);
   const liked = useLibrary((s) => (track?.videoId ? s.liked.some((x) => x.videoId === track.videoId) : false));
   const toggleLike = useLibrary((s) => s.toggleLike);
+  const bitrate = usePlayer((s) => s.bitrate);
   const rate = useSettings((s) => s.rate);
+  const ambient = useSettings((s) => s.ambient);
   const lyricsOffsetMs = useSettings((s) => s.lyricsOffsetMs);
   const setRate = useSettings((s) => s.setRate);
   const setLyricsOffset = useSettings((s) => s.setLyricsOffset);
@@ -151,6 +154,7 @@ export function Fullscreen() {
         <div className="fs-blob" style={{ background: `rgba(${rgb},0.55)` }} />
       </div>
       <div className="fs-veil" />
+      <Ambient src={blobUrl} enabled={ambient && !!blobUrl} playing={playing} />
       <div className="fs-top">
         <button className="icon-btn" style={{ zIndex: 4 }} onClick={() => setFullscreen(false)}>
           <ChevronDown size={22} />
@@ -191,6 +195,7 @@ export function Fullscreen() {
             <span className="pb-time">{fmtTime(position)}</span>
             <input className="slider" type="range" min={0} max={Math.max(dur, 1)} step={0.1} value={position} style={fill(position, dur)} onChange={(e) => seek(Number(e.target.value))} />
             <span className="pb-time">{fmtTime(dur)}</span>
+            {bitrate > 0 && <span className="fs-quality">{Math.round(bitrate / 1000)} kbps</span>}
           </div>
           <div className="fs-transport">
             <button className={`icon-btn${shuffle ? " active" : ""}`} onClick={toggleShuffle}>
@@ -240,20 +245,37 @@ export function Fullscreen() {
       <div className="lyrics-pane">
         <div className="lyrics-scroll" ref={lyricsRef}>
           {lyrics?.synced.length ? (
-            lyrics.synced.map((l, i) => (
-              <div
-                key={i}
-                data-line={i}
-                className={`lyrics-line${i === activeLine ? " active" : ""}`}
-                onClick={() => seek(l.timeMs / 1000)}
-              >
-                {i === activeLine ? (
-                  <KaraokeLine line={l} nextTime={lyrics.synced[i + 1]?.timeMs ?? l.timeMs + 4000} offset={lyricsOffsetMs} />
-                ) : (
-                  l.text
-                )}
-              </div>
-            ))
+            lyrics.synced.map((l, i) => {
+              const nextLine = lyrics.synced[i + 1];
+              const lineEnd = l.words.length ? l.words[l.words.length - 1].endMs : l.timeMs + Math.min(6000, l.text.length * 70);
+              const ms = position * 1000 + lyricsOffsetMs;
+              const inGap =
+                i === activeLine &&
+                !!nextLine &&
+                nextLine.timeMs - lineEnd > 5000 &&
+                ms > lineEnd + 300 &&
+                ms < nextLine.timeMs - 1000;
+              return (
+                <Fragment key={i}>
+                  <div
+                    data-line={i}
+                    className={`lyrics-line${i === activeLine ? " active" : ""}`}
+                    onClick={() => seek(l.timeMs / 1000)}
+                  >
+                    {i === activeLine ? (
+                      <KaraokeLine line={l} nextTime={nextLine?.timeMs ?? l.timeMs + 4000} offset={lyricsOffsetMs} />
+                    ) : (
+                      l.text
+                    )}
+                  </div>
+                  {inGap && nextLine && (
+                    <div className="lyrics-gap" onClick={() => seek(nextLine.timeMs / 1000)}>
+                      <span>{Math.ceil((nextLine.timeMs - ms) / 1000)}</span>
+                    </div>
+                  )}
+                </Fragment>
+              );
+            })
           ) : lyrics?.plain ? (
             <div className="lyrics-plain">{lyrics.plain}</div>
           ) : (

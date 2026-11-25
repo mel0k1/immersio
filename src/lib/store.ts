@@ -4,12 +4,31 @@ import { playableOf } from "../types";
 import type { CollectionItem, LocalTrack, Playable, TrackItem, UserPlaylist } from "../types";
 import { api } from "./ipc";
 import { tKey } from "./i18n";
+import type { Locale } from "./locales";
+
+export type { Locale };
+
+export const DEFAULT_SHORTCUTS: Record<string, string> = {
+  playPause: "Space",
+  nextTrack: "Shift+ArrowRight",
+  prevTrack: "Shift+ArrowLeft",
+  seekForward: "ArrowRight",
+  seekBackward: "ArrowLeft",
+  volumeUp: "ArrowUp",
+  volumeDown: "ArrowDown",
+  toggleMute: "KeyM",
+  toggleFullscreen: "KeyF",
+  likeTrack: "KeyL",
+  toggleQueue: "KeyQ",
+  openSearch: "Control+Slash",
+};
 
 interface SettingsState {
-  lang: "ru" | "en";
+  lang: Locale;
   accent: string;
   theme: "dark" | "light";
   glass: boolean;
+  ambient: boolean;
   streamQuality: "high" | "low";
   rate: number;
   pitchLock: boolean;
@@ -18,12 +37,16 @@ interface SettingsState {
   discordOn: boolean;
   discordId: string;
   offlineCache: boolean;
+  cacheLimit: number;
+  pauseOnDeviceChange: boolean;
+  shortcuts: Record<string, string>;
   eqEnabled: boolean;
   eqGains: number[];
-  setLang: (l: "ru" | "en") => void;
+  setLang: (l: Locale) => void;
   setAccent: (a: string) => void;
   setTheme: (t: "dark" | "light") => void;
   setGlass: (v: boolean) => void;
+  setAmbient: (v: boolean) => void;
   setStreamQuality: (q: "high" | "low") => void;
   setRate: (r: number) => void;
   setPitchLock: (v: boolean) => void;
@@ -32,6 +55,10 @@ interface SettingsState {
   setDiscordOn: (v: boolean) => void;
   setDiscordId: (v: string) => void;
   setOfflineCache: (v: boolean) => void;
+  setCacheLimit: (v: number) => void;
+  setPauseOnDeviceChange: (v: boolean) => void;
+  setShortcut: (action: string, combo: string) => void;
+  resetShortcuts: () => void;
   setEqEnabled: (v: boolean) => void;
   setEqGains: (g: number[]) => void;
 }
@@ -43,6 +70,7 @@ export const useSettings = create<SettingsState>()(
       accent: "#7c5cff",
       theme: "dark",
       glass: true,
+      ambient: true,
       streamQuality: "high",
       rate: 1,
       pitchLock: true,
@@ -51,12 +79,16 @@ export const useSettings = create<SettingsState>()(
       discordOn: true,
       discordId: "",
       offlineCache: true,
+      cacheLimit: 2147483648,
+      pauseOnDeviceChange: true,
+      shortcuts: { ...DEFAULT_SHORTCUTS },
       eqEnabled: false,
       eqGains: [0, 0, 0, 0, 0],
       setLang: (lang) => set({ lang }),
       setAccent: (accent) => set({ accent }),
       setTheme: (theme) => set({ theme }),
       setGlass: (glass) => set({ glass }),
+      setAmbient: (ambient) => set({ ambient }),
       setStreamQuality: (streamQuality) => set({ streamQuality }),
       setRate: (rate) => set({ rate }),
       setPitchLock: (pitchLock) => set({ pitchLock }),
@@ -65,6 +97,10 @@ export const useSettings = create<SettingsState>()(
       setDiscordOn: (discordOn) => set({ discordOn }),
       setDiscordId: (discordId) => set({ discordId }),
       setOfflineCache: (offlineCache) => set({ offlineCache }),
+      setCacheLimit: (cacheLimit) => set({ cacheLimit }),
+      setPauseOnDeviceChange: (pauseOnDeviceChange) => set({ pauseOnDeviceChange }),
+      setShortcut: (action, combo) => set((s) => ({ shortcuts: { ...s.shortcuts, [action]: combo } })),
+      resetShortcuts: () => set({ shortcuts: { ...DEFAULT_SHORTCUTS } }),
       setEqEnabled: (eqEnabled) => set({ eqEnabled }),
       setEqGains: (eqGains) => set({ eqGains }),
     }),
@@ -182,6 +218,7 @@ interface PlayerState {
   loading: boolean;
   position: number;
   duration: number;
+  bitrate: number;
   volume: number;
   muted: boolean;
   shuffle: boolean;
@@ -212,6 +249,7 @@ interface PlayerState {
   setQueueOpen: (v: boolean) => void;
   setPlaying: (v: boolean) => void;
   setPosition: (p: number, d: number) => void;
+  setBitrate: (b: number) => void;
   setSleep: (until: number, atEnd: boolean) => void;
   setError: (e: string | null, blocked?: boolean) => void;
   setLoading: (v: boolean) => void;
@@ -229,6 +267,7 @@ export const usePlayer = create<PlayerState>()(
       loading: false,
       position: 0,
       duration: 0,
+      bitrate: 0,
       volume: 0.8,
       muted: false,
       shuffle: false,
@@ -344,6 +383,7 @@ export const usePlayer = create<PlayerState>()(
       setQueueOpen: (v) => set({ queueOpen: v }),
       setPlaying: (v) => set({ playing: v }),
       setPosition: (position, duration) => set({ position, duration }),
+      setBitrate: (bitrate) => set({ bitrate }),
       setSleep: (sleepUntil, sleepEnd) => set({ sleepUntil, sleepEnd }),
       setError: (error, blocked = false) => set({ error, blocked }),
       setLoading: (loading) => set({ loading }),

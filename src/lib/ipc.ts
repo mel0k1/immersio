@@ -29,6 +29,10 @@ export const api = {
   discordUpdate: (p: { clientId: string; title: string; artist: string; cover: string | null; elapsed: number; remaining: number }) =>
     invoke<void>("discord_update", p),
   discordClear: () => invoke<void>("discord_clear"),
+  mprisUpdate: (p: { title: string; artist: string; art: string; lenUs: number; posUs: number; playing: boolean }) =>
+    invoke<void>("mpris_update", p),
+  setCacheLimit: (limit: number) => invoke<void>("set_cache_limit", { limit }),
+  setIcon: (rgba: number[], w: number, h: number) => invoke<void>("set_window_icon", { rgba, w, h }),
 };
 
 const isWindows = navigator.userAgent.includes("Windows");

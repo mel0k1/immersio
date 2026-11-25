@@ -23,6 +23,7 @@ import { useLibrary, usePlayer, useSettings, useUi } from "./lib/store";
 import { bindEngine } from "./lib/audio";
 import { api } from "./lib/ipc";
 import { useT } from "./lib/i18n";
+import { comboOf } from "./lib/shortcuts";
 import { isOverlayWindow, isTauri } from "./lib/env";
 
 function ErrorToast() {
@@ -69,29 +70,35 @@ function Shortcuts() {
     const onKey = (e: KeyboardEvent) => {
       const el = e.target as HTMLElement;
       if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.isContentEditable)) return;
+      if (document.body.dataset.recording) return;
+      const combo = comboOf(e);
+      if (!combo) return;
+      const binds = useSettings.getState().shortcuts;
       const p = usePlayer.getState();
-      if (e.code === "Space") {
+      if (combo === binds.playPause) {
         e.preventDefault();
         p.toggle();
-      } else if (e.code === "ArrowRight" && e.shiftKey) {
+      } else if (combo === binds.nextTrack) {
+        e.preventDefault();
         p.next();
-      } else if (e.code === "ArrowLeft" && e.shiftKey) {
+      } else if (combo === binds.prevTrack) {
+        e.preventDefault();
         p.prev();
-      } else if (e.code === "ArrowRight") {
+      } else if (combo === binds.seekForward) {
         p.seek(Math.min(p.position + 5, p.duration));
-      } else if (e.code === "ArrowLeft") {
+      } else if (combo === binds.seekBackward) {
         p.seek(Math.max(p.position - 5, 0));
-      } else if (e.code === "ArrowUp") {
+      } else if (combo === binds.volumeUp) {
         e.preventDefault();
         p.setVolume(Math.min(1, p.volume + 0.05));
-      } else if (e.code === "ArrowDown") {
+      } else if (combo === binds.volumeDown) {
         e.preventDefault();
         p.setVolume(Math.max(0, p.volume - 0.05));
-      } else if (e.code === "KeyF") {
-        p.setFullscreen(!p.fullscreen);
-      } else if (e.code === "KeyM") {
+      } else if (combo === binds.toggleMute) {
         p.toggleMute();
-      } else if (e.code === "KeyL") {
+      } else if (combo === binds.toggleFullscreen) {
+        p.setFullscreen(!p.fullscreen);
+      } else if (combo === binds.likeTrack) {
         const t = p.queue[p.index];
         if (t?.videoId) {
           useLibrary.getState().toggleLike({
@@ -104,13 +111,9 @@ function Shortcuts() {
             explicit: !!t.explicit,
           });
         }
-      } else if (e.code === "KeyN") {
-        p.next();
-      } else if (e.code === "KeyB") {
-        p.prev();
-      } else if (e.code === "KeyQ") {
+      } else if (combo === binds.toggleQueue) {
         p.setQueueOpen(!p.queueOpen);
-      } else if (e.code === "Slash" && e.ctrlKey) {
+      } else if (combo === binds.openSearch) {
         nav("/search");
       }
     };
@@ -118,6 +121,48 @@ function Shortcuts() {
     return () => window.removeEventListener("keydown", onKey);
   }, [nav]);
   return null;
+}
+
+let iconImg: HTMLImageElement | null = null;
+
+function tintIcon(accent: string) {
+  if (!isTauri) return;
+  const m = /^#([0-9a-f]{6})$/i.exec(accent);
+  if (!m) return;
+  const apply = () => {
+    if (!iconImg) return;
+    const c = document.createElement("canvas");
+    c.width = iconImg.width;
+    c.height = iconImg.height;
+    const ctx = c.getContext("2d");
+    if (!ctx) return;
+    ctx.drawImage(iconImg, 0, 0);
+    const d = ctx.getImageData(0, 0, c.width, c.height);
+    const ar = parseInt(m[1].slice(0, 2), 16);
+    const ag = parseInt(m[1].slice(2, 4), 16);
+    const ab = parseInt(m[1].slice(4, 6), 16);
+    const px = d.data;
+    for (let i = 0; i < px.length; i += 4) {
+      if (px[i + 3] < 12) continue;
+      const l = (px[i] * 299 + px[i + 1] * 587 + px[i + 2] * 114) / 1000;
+      const k = Math.min(1, Math.max(0, (255 - l) / 160));
+      px[i] = px[i] * (1 - k) + ar * k;
+      px[i + 1] = px[i + 1] * (1 - k) + ag * k;
+      px[i + 2] = px[i + 2] * (1 - k) + ab * k;
+    }
+    ctx.putImageData(d, 0, 0);
+    api.setIcon(Array.from(ctx.getImageData(0, 0, c.width, c.height).data), c.width, c.height).catch(() => undefined);
+  };
+  if (iconImg) {
+    apply();
+    return;
+  }
+  const img = new Image();
+  img.onload = () => {
+    iconImg = img;
+    apply();
+  };
+  img.src = "appicon.png";
 }
 
 function HistoryPush() {
@@ -201,6 +246,7 @@ function Shell() {
 
   useEffect(() => {
     document.documentElement.style.setProperty("--accent", accent);
+    tintIcon(accent);
   }, [accent]);
 
   useEffect(() => {

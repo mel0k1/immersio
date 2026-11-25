@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import type { CSSProperties } from "react";
 import { emit, listen } from "@tauri-apps/api/event";
-import { Pause, Play, SkipBack, SkipForward, X } from "lucide-react";
+import { Clock, Pause, Play, SkipBack, SkipForward, X } from "lucide-react";
 import { Cover } from "./Cover";
 import { fmtTime } from "../lib/format";
 
@@ -15,6 +15,7 @@ interface OverlayState {
   position: number;
   duration: number;
   videoId: string | null;
+  sleepLabel: string;
 }
 
 const initial: OverlayState = {
@@ -27,6 +28,7 @@ const initial: OverlayState = {
   position: 0,
   duration: 0,
   videoId: null,
+  sleepLabel: "",
 };
 
 export function OverlayPage() {
@@ -75,6 +77,9 @@ export function OverlayPage() {
           </div>
         </div>
         <div className="overlay-controls">
+          <button className="icon-btn" style={{ width: 28, height: 28 }} title={s.sleepLabel || undefined} onClick={() => cmd("sleep")}>
+            <Clock size={14} />
+          </button>
           <button className="icon-btn" style={{ width: 28, height: 28 }} onClick={() => cmd("close")}>
             <X size={14} />
           </button>

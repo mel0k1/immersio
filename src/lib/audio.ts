@@ -1,6 +1,8 @@
 import { usePlayer, useSettings } from "./store";
 import { api, localAsset, streamUrl } from "./ipc";
+import type { StreamInfo } from "../types";
 import type { Playable } from "../types";
+import { tKey } from "./i18n";
 import { emit, listen } from "@tauri-apps/api/event";
 import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
 
@@ -51,6 +53,8 @@ class Engine {
   elEq: boolean = false;
   eqCtx: AudioContext | null = null;
   eqFilters: BiquadFilterNode[] | null = null;
+  private preloaded = new Map<string, { info: StreamInfo; at: number }>();
+  private warm: HTMLAudioElement | null = null;
 
   private teardownAudio() {
     if (this.el) {
@@ -152,6 +156,7 @@ class Engine {
     st.setPosition(0, track.durationSecs ?? 0);
     if (track.localPath) {
       this.mode = "audio";
+      st.setBitrate(0);
       const el = this.ensureAudio(false);
       el.src = localAsset(track.localPath);
       el.load();
@@ -164,7 +169,9 @@ class Engine {
     }
     if (!track.videoId) return;
     try {
-      const info = await api.stream(track.videoId, "ru", settings.streamQuality);
+      const hit = this.preloaded.get(track.key);
+      const info = hit ? hit.info : await api.stream(track.videoId, "ru", settings.streamQuality);
+      this.preloaded.delete(track.key);
       if (gen !== this.gen) return;
       this.mode = "audio";
       const el = this.ensureAudio(settings.eqEnabled);
@@ -176,8 +183,10 @@ class Engine {
       this.applyRate();
       this.applyEqGains();
       if (info.durationMs) st.setPosition(0, info.durationMs / 1000);
+      st.setBitrate(info.bitrate ?? 0);
       if (this.shouldPlay) el.play().catch(() => undefined);
       updateMediaSession(track);
+      this.preloadNext();
     } catch (e) {
       if (gen !== this.gen) return;
       const msg = String(e);
@@ -321,6 +330,50 @@ class Engine {
       } catch {}
     }
   }
+
+  private nextTrack(): Playable | null {
+    const s = usePlayer.getState();
+    if (s.queue.length === 0 || s.repeat === "one") return null;
+    let i = s.index + 1;
+    if (i >= s.queue.length) {
+      if (s.repeat !== "all") return null;
+      i = 0;
+    }
+    const n = s.queue[i];
+    if (!n?.videoId || n.key === this.current?.key) return null;
+    return n;
+  }
+
+  preloadNext() {
+    const n = this.nextTrack();
+    if (!n?.videoId) return;
+    const have = this.preloaded.get(n.key);
+    if (have && Date.now() - have.at < 240000) return;
+    const settings = useSettings.getState();
+    api
+      .stream(n.videoId, "ru", settings.streamQuality)
+      .then((info) => {
+        this.preloaded.set(n.key, { info, at: Date.now() });
+        if (this.preloaded.size > 4) {
+          const oldest = [...this.preloaded.entries()].sort((a, b) => a[1].at - b[1].at)[0];
+          if (oldest) this.preloaded.delete(oldest[0]);
+        }
+        if (settings.offlineCache && !this.warm) {
+          const el = new Audio();
+          this.warm = el;
+          el.preload = "auto";
+          el.src = streamUrl(info, n.videoId!, true);
+          el.load();
+          window.setTimeout(() => {
+            el.pause();
+            el.removeAttribute("src");
+            el.load();
+            if (this.warm === el) this.warm = null;
+          }, 45000);
+        }
+      })
+      .catch(() => undefined);
+  }
 }
 
 function emitTime(pos: number, dur: number) {
@@ -359,6 +412,9 @@ export function emitOverlayState() {
   if (!isTauri) return;
   const s = usePlayer.getState();
   const t = s.queue[s.index];
+  const lang = useSettings.getState().lang;
+  const minsLeft = s.sleepUntil > Date.now() ? Math.ceil((s.sleepUntil - Date.now()) / 60000) : 0;
+  const sleepLabel = s.sleepEnd ? tKey(lang, "sleepEnd") : minsLeft > 0 ? `${tKey(lang, "sleepTimer")}: ${minsLeft}` : "";
   emit("imm-state", {
     hasTrack: !!t,
     title: t?.title ?? "",
@@ -369,6 +425,7 @@ export function emitOverlayState() {
     position: s.position,
     duration: s.duration || t?.durationSecs || 0,
     videoId: t?.videoId ?? null,
+    sleepLabel,
   }).catch(() => undefined);
 }
 
@@ -405,6 +462,22 @@ function syncDiscord(s: ReturnType<typeof usePlayer.getState>, force = false) {
 
 const SESSION_KEY = "imm-session";
 
+function mprisMeta() {
+  const s = usePlayer.getState();
+  const t = s.queue[s.index];
+  if (!t) return;
+  api
+    .mprisUpdate({
+      title: t.title,
+      artist: t.artists.join(", "),
+      art: t.thumb ?? "",
+      lenUs: Math.round((s.duration || t.durationSecs || 0) * 1e6),
+      posUs: Math.round(engine.position() * 1e6),
+      playing: s.playing,
+    })
+    .catch(() => undefined);
+}
+
 export function bindEngine() {
   try {
     const sess = JSON.parse(localStorage.getItem(SESSION_KEY) || "null");
@@ -422,33 +495,43 @@ export function bindEngine() {
     if ((t?.key ?? null) !== (tp?.key ?? null)) {
       engine.load(t);
       syncDiscord(s);
+      mprisMeta();
       emitOverlayState();
       return;
     }
     if (s.playing !== prev.playing) {
       engine.setPlaying(s.playing);
       syncDiscord(s);
+      mprisMeta();
       emitOverlayState();
     }
     if (s.volume !== prev.volume || s.muted !== prev.muted) engine.applyVolume();
     if (Math.abs(s.position - prev.position) > 1.1 && Math.abs(s.position - engine.position()) > 1.1) {
       engine.seek(s.position);
+      mprisMeta();
     }
     if (Math.abs(s.position - prev.position) > 0.25) emitOverlayState();
   });
   useSettings.subscribe((s, prev) => {
     if (s.rate !== prev.rate || s.pitchLock !== prev.pitchLock) engine.applyRate();
     if (s.discordOn !== prev.discordOn || s.discordId !== prev.discordId) syncDiscord(usePlayer.getState(), true);
+    if (s.cacheLimit !== prev.cacheLimit) api.setCacheLimit(s.cacheLimit).catch(() => undefined);
     if (s.eqEnabled !== prev.eqEnabled) engine.reloadCurrent();
     if (s.eqEnabled && s.eqGains !== prev.eqGains) engine.applyEqGains();
     if (s.offlineCache !== prev.offlineCache) {
       // cache flag is applied on next track load
     }
   });
+  api.setCacheLimit(useSettings.getState().cacheLimit).catch(() => undefined);
   window.setInterval(() => {
     const st = usePlayer.getState();
-    if (st.playing) syncDiscord(st, true);
-  }, 15000);
+    if (st.playing) {
+      syncDiscord(st, true);
+      mprisMeta();
+      const dur = st.duration || st.queue[st.index]?.durationSecs || 0;
+      if (dur > 0 && engine.position() > dur - 30) engine.preloadNext();
+    }
+  }, 5000);
   window.setInterval(() => {
     const s = usePlayer.getState();
     if (s.playing) {
@@ -471,11 +554,38 @@ export function bindEngine() {
       else if (cmd === "next") p.next();
       else if (cmd === "prev") p.prev();
       else if (cmd === "seek" && typeof value === "number") p.seek(value);
-      else if (cmd === "close") {
+      else if (cmd === "sleep") {
+        const now = Date.now();
+        const minsLeft = p.sleepUntil > now ? Math.ceil((p.sleepUntil - now) / 60000) : 0;
+        const opts = [15, 30, 60];
+        const idx = p.sleepEnd || minsLeft === 0 ? -1 : opts.indexOf(minsLeft);
+        const nextIdx = (idx === -1 ? -1 : idx) + 1;
+        if (nextIdx >= opts.length) p.setSleep(0, false);
+        else p.setSleep(now + opts[nextIdx === -1 ? 0 : nextIdx] * 60000, false);
+      } else if (cmd === "close") {
         WebviewWindow.getByLabel("overlay").then((w) => w?.close()).catch(() => undefined);
       }
     }).catch(() => undefined);
+    listen<string>("imm-mpris", (e) => {
+      const p = usePlayer.getState();
+      if (e.payload === "play") p.setPlaying(true);
+      else if (e.payload === "pause") p.setPlaying(false);
+      else if (e.payload === "toggle") p.toggle();
+      else if (e.payload === "next") p.next();
+      else if (e.payload === "prev") p.prev();
+    }).catch(() => undefined);
   }
+  let deviceInit = false;
+  navigator.mediaDevices?.addEventListener?.("devicechange", () => {
+    if (!deviceInit) {
+      deviceInit = true;
+      navigator.mediaDevices.enumerateDevices().catch(() => undefined);
+      return;
+    }
+    if (useSettings.getState().pauseOnDeviceChange && usePlayer.getState().playing) {
+      usePlayer.getState().setPlaying(false);
+    }
+  });
   if ("mediaSession" in navigator) {
     navigator.mediaSession.setActionHandler("play", () => usePlayer.getState().setPlaying(true));
     navigator.mediaSession.setActionHandler("pause", () => usePlayer.getState().setPlaying(false));
