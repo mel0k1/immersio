@@ -2,12 +2,14 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown, Heart, Pause, Play, Repeat, Repeat1, Shuffle, SkipBack, SkipForward, Volume1, Volume2, VolumeX } from "lucide-react";
 import { api } from "../lib/ipc";
 import { dominantColor, imageBlobUrl } from "../lib/cover";
-import { useLibrary, usePlayer } from "../lib/store";
+import { useLibrary, usePlayer, useSettings } from "../lib/store";
 import { useT } from "../lib/i18n";
 import { fmtTime, hexToRgb } from "../lib/format";
 import { Cover } from "./Cover";
 import type { CSSProperties } from "react";
 import type { Lyrics } from "../types";
+
+const RATES = [0.75, 1, 1.25, 1.5, 2];
 
 function fill(v: number, max: number): CSSProperties {
   const pct = max > 0 ? Math.min(100, (v / max) * 100) : 0;
@@ -27,6 +29,10 @@ export function Fullscreen() {
   const repeat = usePlayer((s) => s.repeat);
   const liked = useLibrary((s) => (track?.videoId ? s.liked.some((x) => x.videoId === track.videoId) : false));
   const toggleLike = useLibrary((s) => s.toggleLike);
+  const rate = useSettings((s) => s.rate);
+  const lyricsOffsetMs = useSettings((s) => s.lyricsOffsetMs);
+  const setRate = useSettings((s) => s.setRate);
+  const setLyricsOffset = useSettings((s) => s.setLyricsOffset);
   const { setFullscreen, toggle, next, prev, seek, setVolume, toggleMute, toggleShuffle, cycleRepeat } = usePlayer.getState();
   const [lyrics, setLyrics] = useState<Lyrics | null>(null);
   const [lyricsFail, setLyricsFail] = useState(false);
@@ -60,7 +66,7 @@ export function Fullscreen() {
 
   const activeLine = useMemo(() => {
     if (!lyrics?.synced.length) return -1;
-    const ms = position * 1000;
+    const ms = position * 1000 + lyricsOffsetMs;
     let lo = 0;
     let hi = lyrics.synced.length - 1;
     let idx = -1;
@@ -74,7 +80,7 @@ export function Fullscreen() {
       }
     }
     return idx;
-  }, [lyrics, position]);
+  }, [lyrics, position, lyricsOffsetMs]);
 
   useEffect(() => {
     if (!fullscreen || activeLine < 0 || !lyricsRef.current) return;
@@ -99,6 +105,25 @@ export function Fullscreen() {
         <button className="icon-btn" style={{ zIndex: 4 }} onClick={() => setFullscreen(false)}>
           <ChevronDown size={22} />
         </button>
+        <div style={{ display: "flex", gap: 8, alignItems: "center", zIndex: 4 }}>
+          {lyrics?.synced.length ? (
+            <div className="seg" style={{ background: "rgba(255,255,255,0.12)" }}>
+              <button onClick={() => setLyricsOffset(lyricsOffsetMs - 200)}>−200</button>
+              <button onClick={() => setLyricsOffset(0)} title={t("lyricsOffset")}>
+                {lyricsOffsetMs === 0 ? t("lyricsOffset") : `${lyricsOffsetMs}ms`}
+              </button>
+              <button onClick={() => setLyricsOffset(lyricsOffsetMs + 200)}>+200</button>
+            </div>
+          ) : null}
+          <button
+            className="pill"
+            style={{ background: "rgba(255,255,255,0.12)", color: rate !== 1 ? "var(--accent)" : undefined, fontWeight: 700 }}
+            onClick={() => setRate(RATES[(RATES.indexOf(rate) + 1) % RATES.length] ?? 1)}
+            title={t("speed")}
+          >
+            {rate}×
+          </button>
+        </div>
         <div className="win-controls" style={{ position: "static" }} />
       </div>
       <div className="fs-left">

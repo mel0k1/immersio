@@ -1,12 +1,25 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { playableOf } from "../types";
 import type { CollectionItem, LocalTrack, Playable, TrackItem, UserPlaylist } from "../types";
+import { api } from "./ipc";
+import { tKey } from "./i18n";
 
 interface SettingsState {
   lang: "ru" | "en";
   accent: string;
+  streamQuality: "high" | "low";
+  rate: number;
+  lyricsOffsetMs: number;
+  radioAuto: boolean;
+  discordId: string;
   setLang: (l: "ru" | "en") => void;
   setAccent: (a: string) => void;
+  setStreamQuality: (q: "high" | "low") => void;
+  setRate: (r: number) => void;
+  setLyricsOffset: (ms: number) => void;
+  setRadioAuto: (v: boolean) => void;
+  setDiscordId: (v: string) => void;
 }
 
 export const useSettings = create<SettingsState>()(
@@ -14,8 +27,18 @@ export const useSettings = create<SettingsState>()(
     (set) => ({
       lang: "ru",
       accent: "#7c5cff",
+      streamQuality: "high",
+      rate: 1,
+      lyricsOffsetMs: 0,
+      radioAuto: true,
+      discordId: "",
       setLang: (lang) => set({ lang }),
       setAccent: (accent) => set({ accent }),
+      setStreamQuality: (streamQuality) => set({ streamQuality }),
+      setRate: (rate) => set({ rate }),
+      setLyricsOffset: (lyricsOffsetMs) => set({ lyricsOffsetMs }),
+      setRadioAuto: (radioAuto) => set({ radioAuto }),
+      setDiscordId: (discordId) => set({ discordId }),
     }),
     { name: "imm-settings" },
   ),
@@ -147,8 +170,10 @@ interface PlayerState {
   addToQueue: (t: Playable) => void;
   playNext: (t: Playable) => void;
   removeFromQueue: (i: number) => void;
+  moveInQueue: (from: number, to: number) => void;
   jumpTo: (i: number) => void;
   clearQueue: () => void;
+  startRadio: () => Promise<void>;
   setFullscreen: (v: boolean) => void;
   setQueueOpen: (v: boolean) => void;
   setPlaying: (v: boolean) => void;
@@ -185,7 +210,7 @@ export const usePlayer = create<PlayerState>()(
         set((s) => ({ playing: !s.playing }));
         audioBind?.(get());
       },
-      next: () => {
+      next: async () => {
         const s = get();
         if (s.queue.length === 0) return;
         if (s.shuffle) {
@@ -200,7 +225,20 @@ export const usePlayer = create<PlayerState>()(
         } else if (s.repeat === "all") {
           set({ index: 0, position: 0 });
         } else {
-          set({ playing: false, position: 0 });
+          const cur = s.queue[s.index];
+          if (useSettings.getState().radioAuto && cur?.videoId) {
+            try {
+              const radio = await api.radio(cur.videoId, "ru");
+              const list = radio.map(playableOf);
+              set({ queue: [...s.queue, ...list], index: s.index + 1, position: 0, playing: true });
+              audioBind?.(get());
+              return;
+            } catch {
+              set({ playing: false, position: 0 });
+            }
+          } else {
+            set({ playing: false, position: 0 });
+          }
         }
         audioBind?.(get());
       },
@@ -232,11 +270,36 @@ export const usePlayer = create<PlayerState>()(
           if (i < s.index) index -= 1;
           return { queue, index };
         }),
+      moveInQueue: (from, to) =>
+        set((s) => {
+          if (to < 0 || to >= s.queue.length || from === to) return {};
+          const queue = [...s.queue];
+          const [item] = queue.splice(from, 1);
+          queue.splice(to, 0, item);
+          let index = s.index;
+          if (from === s.index) index = to;
+          else if (from < s.index && to >= s.index) index = s.index - 1;
+          else if (from > s.index && to <= s.index) index = s.index + 1;
+          return { queue, index };
+        }),
       jumpTo: (i) => {
         set({ index: i, position: 0, error: null });
         audioBind?.(get());
       },
       clearQueue: () => set({ queue: [], index: 0, playing: false }),
+      startRadio: async () => {
+        const s = get();
+        const cur = s.queue[s.index];
+        if (!cur?.videoId) return;
+        try {
+          const radio = await api.radio(cur.videoId, "ru");
+          const list = radio.map(playableOf).filter((t) => t.key !== cur.key);
+          set({ queue: [...s.queue, ...list] });
+          useUi.getState().showToast(`${tKey(useSettings.getState().lang, "radio")}: +${list.length}`);
+        } catch (e) {
+          useUi.getState().showToast(String(e));
+        }
+      },
       setFullscreen: (v) => set({ fullscreen: v }),
       setQueueOpen: (v) => set({ queueOpen: v }),
       setPlaying: (v) => set({ playing: v }),

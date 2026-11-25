@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Play, Shuffle, Search, Plus, Check } from "lucide-react";
+import { Play, Shuffle, Search, Plus, Check, ListPlus } from "lucide-react";
 import { api } from "../lib/ipc";
 import { bestThumb, playableOf, type Browse, type Thumb, type TrackItem } from "../types";
-import { useLibrary, usePlayer } from "../lib/store";
+import { useLibrary, usePlayer, useUi } from "../lib/store";
 import { useT } from "../lib/i18n";
 import { fmtTotal } from "../lib/format";
 import { TrackRow } from "../components/TrackRow";
@@ -226,7 +226,21 @@ export function ArtistPage() {
           ) : null
         }
         onPlayAll={() => artist.topTracks.length > 0 && playContext(artist.topTracks.map(playableOf), 0)}
-        extra={<SaveButton item={{ browseId: artist.browseId, kind: "artist", title: artist.name, subtitle: t("artists"), thumbs: artist.thumbs }} />}
+        extra={
+          <>
+            <button
+              className="btn"
+              onClick={() => {
+                artist.topTracks.forEach((tr) => usePlayer.getState().addToQueue(playableOf(tr)));
+                useUi.getState().showToast(`${t("addToQueue")}: +${artist.topTracks.length}`);
+              }}
+            >
+              <ListPlus size={16} />
+              {t("addToQueue")}
+            </button>
+            <SaveButton item={{ browseId: artist.browseId, kind: "artist", title: artist.name, subtitle: t("artists"), thumbs: artist.thumbs }} />
+          </>
+        }
       />
       <div className="section-title" style={{ margin: "26px 0 12px" }}>{t("topTracks")}</div>
       <SearchFilter value={q} onChange={setQ} />

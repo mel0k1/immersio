@@ -11,10 +11,11 @@ type Tab = (typeof TABS)[number];
 
 export function SettingsPage() {
   const t = useT();
-  const { lang, accent, setLang, setAccent } = useSettings();
+  const { lang, accent, setLang, setAccent, streamQuality, rate, radioAuto, discordId, setStreamQuality, setRate, setRadioAuto, setDiscordId } = useSettings();
   const showToast = useUi((s) => s.showToast);
   const clearAll = useLibrary((s) => s.clearAll);
   const [version, setVersion] = useState("");
+  const [discordInput, setDiscordInput] = useState(discordId);
   const [tab, setTab] = useState<Tab>("appearance");
   useEffect(() => {
     api.version().then(setVersion).catch(() => setVersion(""));
@@ -67,6 +68,50 @@ export function SettingsPage() {
           {tab === "playback" && (
             <>
               <div className="settings-row">
+                <div className="settings-label">{t("streamQuality")}</div>
+                <div className="seg">
+                  <button className={streamQuality === "high" ? "active" : ""} onClick={() => setStreamQuality("high")}>
+                    {t("qualityHigh")}
+                  </button>
+                  <button className={streamQuality === "low" ? "active" : ""} onClick={() => setStreamQuality("low")}>
+                    {t("qualityLow")}
+                  </button>
+                </div>
+              </div>
+              <div className="settings-row">
+                <div className="settings-label">{t("speed")}</div>
+                <div className="seg">
+                  {[0.75, 1, 1.25, 1.5, 2].map((r) => (
+                    <button key={r} className={rate === r ? "active" : ""} onClick={() => setRate(r)}>
+                      {r}×
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="settings-row">
+                <div>
+                  <div className="settings-label">{t("radioAuto")}</div>
+                  <div className="settings-desc">{t("radioAutoDesc")}</div>
+                </div>
+                <button className={`btn${radioAuto ? " accent" : ""}`} onClick={() => setRadioAuto(!radioAuto)}>
+                  {radioAuto ? "ON" : "OFF"}
+                </button>
+              </div>
+              <div className="settings-row">
+                <div>
+                  <div className="settings-label">{t("discordId")}</div>
+                  <div className="settings-desc">{t("discordDesc")}</div>
+                </div>
+                <input
+                  className="field"
+                  style={{ width: 240, marginBottom: 0 }}
+                  placeholder="1234567890"
+                  value={discordInput}
+                  onChange={(e) => setDiscordInput(e.target.value.replace(/[^0-9]/g, ""))}
+                  onBlur={() => setDiscordId(discordInput)}
+                />
+              </div>
+              <div className="settings-row">
                 <div>
                   <div className="settings-label">{t("shortcuts")}</div>
                   <div className="settings-desc">{t("shortcutsDesc")}</div>
@@ -96,7 +141,7 @@ export function SettingsPage() {
                 <div>
                   <div style={{ fontSize: 17, fontWeight: 750 }}>Immersio</div>
                   <div style={{ color: "var(--text-dim)", fontSize: 13 }}>
-                    {t("version")} {version || "0.1.0"}
+                    {t("version")} {version || "0.2.0"}
                   </div>
                 </div>
               </div>

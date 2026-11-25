@@ -1,8 +1,10 @@
 import { useState } from "react";
-import { Heart, ListPlus, ListStart, MoreVertical, Play, Trash2, User, Disc3, Pause } from "lucide-react";
+import { Heart, Link2, ListPlus, ListStart, MoreVertical, Play, Radio, Trash2, User, Disc3, Pause } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import type { Playable, TrackItem } from "../types";
+import { playableOf } from "../types";
 import { useLibrary, usePlayer, useUi } from "../lib/store";
+import { api } from "../lib/ipc";
 import { useT } from "../lib/i18n";
 import { fmtTime } from "../lib/format";
 import { Menu, type MenuItem } from "./Menu";
@@ -23,6 +25,7 @@ export function TrackRow({ raw, track, index, queue, onRemove, showAlbumLink = t
   const liked = useLibrary((s) => s.liked.some((x) => x.videoId === track.videoId));
   const toggleLike = useLibrary((s) => s.toggleLike);
   const addToPlaylist = useUi((s) => s.openAddToPlaylist);
+  const showToast = useUi((s) => s.showToast);
   const currentKey = usePlayer((s) => (s.queue[s.index]?.key ?? null));
   const playing = usePlayer((s) => s.playing);
   const playContext = usePlayer((s) => s.playContext);
@@ -48,6 +51,25 @@ export function TrackRow({ raw, track, index, queue, onRemove, showAlbumLink = t
     items.push({ icon: ListPlus, label: t("addToPlaylist"), onClick: () => addToPlaylist([raw]) });
     items.push({ icon: ListStart, label: t("playNext"), onClick: () => playNext(track) });
     items.push({ icon: Play, label: t("addToQueue"), onClick: () => addToQueue(track) });
+    items.push({
+      icon: Radio,
+      label: t("startRadio"),
+      onClick: async () => {
+        try {
+          const radio = await api.radio(raw.videoId, "ru");
+          playContext([track, ...radio.map(playableOf)], 0);
+        } catch (e) {
+          showToast(String(e));
+        }
+      },
+    });
+    items.push({
+      icon: Link2,
+      label: t("copyLink"),
+      onClick: () => {
+        navigator.clipboard.writeText(`https://music.youtube.com/watch?v=${raw.videoId}`).then(() => showToast(t("linkCopied")));
+      },
+    });
     items.push({ label: "-" });
     if (raw.artists[0]) {
       const artistName = raw.artists[0];

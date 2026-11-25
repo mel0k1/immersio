@@ -1,6 +1,7 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { HashRouter, Route, Routes, useNavigate } from "react-router-dom";
 import { AlertTriangle, X } from "lucide-react";
+import { getCurrentWebview } from "@tauri-apps/api/webview";
 import "@fontsource-variable/inter";
 import "./styles/global.css";
 import { Sidebar } from "./components/Sidebar";
@@ -16,8 +17,12 @@ import { SettingsPage } from "./pages/SettingsPage";
 import { LikedPage, MyPlaylistPage } from "./pages/LibraryPages";
 import { LocalPage } from "./pages/LocalPage";
 import { CollectionPage, ArtistPage } from "./pages/CollectionPages";
-import { useLibrary, usePlayer, useSettings } from "./lib/store";
+import { useLibrary, usePlayer, useSettings, useUi } from "./lib/store";
 import { bindEngine } from "./lib/audio";
+import { api } from "./lib/ipc";
+import { useT } from "./lib/i18n";
+
+const isTauri = "__TAURI_INTERNALS__" in window;
 
 function ErrorToast() {
   const error = usePlayer((s) => s.error);
@@ -88,6 +93,69 @@ function HistoryPush() {
   return null;
 }
 
+function DropOverlay() {
+  const t = useT();
+  const [active, setActive] = useState(false);
+  useEffect(() => {
+    if (!isTauri) return;
+    let unlisten: (() => void) | null = null;
+    let alive = true;
+    getCurrentWebview()
+      .onDragDropEvent((e) => {
+        if (e.payload.type === "enter") {
+          setActive(true);
+        } else if (e.payload.type === "over") {
+          setActive(true);
+        } else if (e.payload.type === "drop") {
+          setActive(false);
+          const paths = e.payload.paths ?? [];
+          if (paths.length > 0) {
+            api
+              .importLocal(paths)
+              .then((added) => {
+                if (added.length > 0) {
+                  useLibrary.getState().addLocal(added);
+                  useUi.getState().showToast(`+${added.length}`);
+                }
+              })
+              .catch(() => undefined);
+          }
+        } else if (e.payload.type === "leave") {
+          setActive(false);
+        }
+      })
+      .then((fn) => {
+        if (!alive) fn();
+        else unlisten = fn;
+      });
+    return () => {
+      alive = false;
+      unlisten?.();
+    };
+  }, []);
+  if (!active) return null;
+  return (
+    <div
+      style={{
+        position: "fixed",
+        inset: 12,
+        zIndex: 100,
+        background: "rgba(13,13,16,0.55)",
+        backdropFilter: "blur(10px)",
+        border: "2px dashed var(--accent)",
+        borderRadius: 20,
+        display: "grid",
+        placeItems: "center",
+        pointerEvents: "none",
+        fontWeight: 750,
+        fontSize: 18,
+      }}
+    >
+      {t("dropTitle")}
+    </div>
+  );
+}
+
 function Shell() {
   const accent = useSettings((s) => s.accent);
   const queueOpen = usePlayer((s) => s.queueOpen);
@@ -127,6 +195,7 @@ function Shell() {
       <PlaylistModals />
       <Toast />
       <ErrorToast />
+      <DropOverlay />
       <Shortcuts />
       <HistoryPush />
     </div>

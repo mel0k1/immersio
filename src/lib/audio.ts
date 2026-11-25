@@ -1,4 +1,4 @@
-import { usePlayer } from "./store";
+import { usePlayer, useSettings } from "./store";
 import { api, localAsset, streamUrl } from "./ipc";
 import type { Playable } from "../types";
 
@@ -7,6 +7,7 @@ interface YTPlayer {
   pauseVideo(): void;
   seekTo(s: number, allow: boolean): void;
   setVolume(v: number): void;
+  setPlaybackRate(r: number): void;
   getCurrentTime(): number;
   getDuration(): number;
   destroy(): void;
@@ -92,6 +93,7 @@ class Engine {
       el.src = localAsset(track.localPath);
       el.load();
       this.applyVolume();
+      this.applyRate();
       if (this.shouldPlay) el.play().catch(() => undefined);
       st.setLoading(false);
       updateMediaSession(track);
@@ -99,13 +101,15 @@ class Engine {
     }
     if (!track.videoId) return;
     try {
-      const info = await api.stream(track.videoId, "ru");
+      const q = useSettings.getState().streamQuality;
+      const info = await api.stream(track.videoId, "ru", q);
       if (gen !== this.gen) return;
       this.mode = "audio";
       const el = this.audio();
       el.src = streamUrl(info);
       el.load();
       this.applyVolume();
+      this.applyRate();
       if (info.durationMs) st.setPosition(0, info.durationMs / 1000);
       if (this.shouldPlay) el.play().catch(() => undefined);
       updateMediaSession(track);
@@ -150,6 +154,7 @@ class Engine {
             if (gen !== this.gen) return;
             usePlayer.getState().setLoading(false);
             this.applyVolume();
+            this.applyRate();
             if (this.shouldPlay) this.yt?.playVideo();
             updateMediaSession(track);
           },
@@ -226,6 +231,16 @@ class Engine {
     if (this.mode === "audio" && this.el) this.el.volume = v;
     else if (this.mode === "iframe" && this.yt) this.yt.setVolume(Math.round(v * 100));
   }
+
+  applyRate() {
+    const r = useSettings.getState().rate;
+    if (this.mode === "audio" && this.el) this.el.playbackRate = r;
+    else if (this.mode === "iframe" && this.yt) {
+      try {
+        this.yt.setPlaybackRate(r);
+      } catch {}
+    }
+  }
 }
 
 function emitTime(pos: number, dur: number) {
@@ -255,20 +270,60 @@ function updateMediaSession(t: Playable) {
 
 export const engine = new Engine();
 
+let discordKey = "";
+
+function syncDiscord(s: ReturnType<typeof usePlayer.getState>, force = false) {
+  const id = useSettings.getState().discordId;
+  const t = s.queue[s.index];
+  if (!id || !t) {
+    if (discordKey !== "") {
+      discordKey = "";
+      api.discordClear().catch(() => undefined);
+    }
+    return;
+  }
+  const key = `${t.key}|${s.playing}`;
+  if (!force && key === discordKey) return;
+  discordKey = key;
+  const dur = s.duration || t.durationSecs || 0;
+  api
+    .discordUpdate({
+      clientId: id,
+      title: t.title,
+      artist: t.artists.join(", ") || "Immersio",
+      cover: t.thumb ?? null,
+      elapsed: Math.round(s.position),
+      remaining: Math.max(0, Math.round(dur - s.position)),
+    })
+    .catch(() => undefined);
+}
+
 export function bindEngine() {
   usePlayer.subscribe((s, prev) => {
     const t = s.queue[s.index];
     const tp = prev.queue[prev.index];
     if ((t?.key ?? null) !== (tp?.key ?? null)) {
       engine.load(t);
+      syncDiscord(s);
       return;
     }
-    if (s.playing !== prev.playing) engine.setPlaying(s.playing);
+    if (s.playing !== prev.playing) {
+      engine.setPlaying(s.playing);
+      syncDiscord(s);
+    }
     if (s.volume !== prev.volume || s.muted !== prev.muted) engine.applyVolume();
     if (Math.abs(s.position - prev.position) > 1.1 && Math.abs(s.position - engine.position()) > 1.1) {
       engine.seek(s.position);
     }
   });
+  useSettings.subscribe((s, prev) => {
+    if (s.rate !== prev.rate) engine.applyRate();
+    if (s.discordId !== prev.discordId) syncDiscord(usePlayer.getState(), true);
+  });
+  window.setInterval(() => {
+    const st = usePlayer.getState();
+    if (st.playing) syncDiscord(st, true);
+  }, 15000);
   if ("mediaSession" in navigator) {
     navigator.mediaSession.setActionHandler("play", () => usePlayer.getState().setPlaying(true));
     navigator.mediaSession.setActionHandler("pause", () => usePlayer.getState().setPlaying(false));
