@@ -87,8 +87,17 @@ jobs:
           tag = os.environ["TAG"]
           ver = tag.lstrip("v")
 
-          rel = json.loads(subprocess.check_output(
-              ["gh", "api", "-R", repo, f"releases/tags/{tag}"]))
+          rel = None
+          for attempt in range(5):
+              try:
+                  rel = json.loads(subprocess.check_output(
+                      ["gh", "api", "-R", repo, f"releases/tags/{tag}"]))
+                  break
+              except subprocess.CalledProcessError:
+                  if attempt == 4:
+                      raise
+                  import time
+                  time.sleep(15)
           assets = {a["name"]: a["browser_download_url"] for a in rel.get("assets", [])}
 
           RULES = [
