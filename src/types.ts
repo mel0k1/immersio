@@ -14,6 +14,7 @@ export interface TrackItem {
   durationSecs: number | null;
   thumbs: Thumb[];
   explicit: boolean;
+  url?: string | null;
 }
 
 export interface CollectionItem {

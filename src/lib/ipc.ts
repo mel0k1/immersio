@@ -4,6 +4,8 @@ import type { Browse, ImportResult, Lyrics, LocalTrack, SearchResults, StreamInf
 export const api = {
   search: (query: string, hl: string) =>
     invoke<SearchResults>("yt_search", { query, hl }),
+  searchSoundcloud: (query: string) =>
+    invoke<TrackItem[]>("sc_search", { query }),
   browse: (browseId: string, hl: string) =>
     invoke<Browse>("yt_browse", { browseId, hl }),
   stream: (videoId: string, hl: string, quality: string) =>

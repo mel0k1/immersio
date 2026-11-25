@@ -85,7 +85,7 @@ class Engine {
       });
       this.el.addEventListener("ended", () => onEnded());
       this.el.addEventListener("error", () => {
-        if (this.mode === "audio" && this.current?.videoId) this.fallbackIframe(this.current);
+        if (this.mode === "audio" && this.current?.videoId && !this.current.videoId.startsWith("sc:")) this.fallbackIframe(this.current);
         else if (this.mode === "audio") usePlayer.getState().setError("streamError");
       });
       if (needEq) this.buildEqGraph(this.el);
@@ -183,6 +183,10 @@ class Engine {
       const msg = String(e);
       if (msg.startsWith("blocked")) {
         st.setError("blockedDesc", true);
+      }
+      if (track.videoId?.startsWith("sc:")) {
+        st.setError("streamError");
+        return;
       }
       this.fallbackIframe(track);
     }
@@ -307,11 +311,13 @@ class Engine {
   }
 
   applyRate() {
-    const r = useSettings.getState().rate;
-    if (this.mode === "audio" && this.el) this.el.playbackRate = r;
-    else if (this.mode === "iframe" && this.yt) {
+    const { rate, pitchLock } = useSettings.getState();
+    if (this.mode === "audio" && this.el) {
+      this.el.preservesPitch = pitchLock;
+      this.el.playbackRate = rate;
+    } else if (this.mode === "iframe" && this.yt) {
       try {
-        this.yt.setPlaybackRate(r);
+        this.yt.setPlaybackRate(rate);
       } catch {}
     }
   }
@@ -324,6 +330,11 @@ function emitTime(pos: number, dur: number) {
 
 function onEnded() {
   const st = usePlayer.getState();
+  if (st.sleepEnd) {
+    st.setSleep(0, false);
+    st.setPlaying(false);
+    return;
+  }
   if (st.repeat === "one") {
     engine.seek(0);
     engine.setPlaying(true);
@@ -363,16 +374,19 @@ export function emitOverlayState() {
 
 let discordKey = "";
 
+const DISCORD_APP_ID = "1177081335727267940";
+
 function syncDiscord(s: ReturnType<typeof usePlayer.getState>, force = false) {
-  const id = useSettings.getState().discordId;
+  const st = useSettings.getState();
   const t = s.queue[s.index];
-  if (!id || !t) {
+  if (!st.discordOn || !t) {
     if (discordKey !== "") {
       discordKey = "";
       api.discordClear().catch(() => undefined);
     }
     return;
   }
+  const id = st.discordId.trim() || DISCORD_APP_ID;
   const key = `${t.key}|${s.playing}`;
   if (!force && key === discordKey) return;
   discordKey = key;
@@ -389,7 +403,19 @@ function syncDiscord(s: ReturnType<typeof usePlayer.getState>, force = false) {
     .catch(() => undefined);
 }
 
+const SESSION_KEY = "imm-session";
+
 export function bindEngine() {
+  try {
+    const sess = JSON.parse(localStorage.getItem(SESSION_KEY) || "null");
+    if (sess?.queue?.length) {
+      const index = Math.min(sess.index, sess.queue.length - 1);
+      usePlayer.setState({ queue: sess.queue, index, position: sess.savedPos || 0 });
+      engine.pendingSeek = sess.savedPos || 0;
+      engine.load(sess.queue[index]);
+      syncDiscord(usePlayer.getState(), true);
+    }
+  } catch {}
   usePlayer.subscribe((s, prev) => {
     const t = s.queue[s.index];
     const tp = prev.queue[prev.index];
@@ -411,8 +437,8 @@ export function bindEngine() {
     if (Math.abs(s.position - prev.position) > 0.25) emitOverlayState();
   });
   useSettings.subscribe((s, prev) => {
-    if (s.rate !== prev.rate) engine.applyRate();
-    if (s.discordId !== prev.discordId) syncDiscord(usePlayer.getState(), true);
+    if (s.rate !== prev.rate || s.pitchLock !== prev.pitchLock) engine.applyRate();
+    if (s.discordOn !== prev.discordOn || s.discordId !== prev.discordId) syncDiscord(usePlayer.getState(), true);
     if (s.eqEnabled !== prev.eqEnabled) engine.reloadCurrent();
     if (s.eqEnabled && s.eqGains !== prev.eqGains) engine.applyEqGains();
     if (s.offlineCache !== prev.offlineCache) {
@@ -423,6 +449,19 @@ export function bindEngine() {
     const st = usePlayer.getState();
     if (st.playing) syncDiscord(st, true);
   }, 15000);
+  window.setInterval(() => {
+    const s = usePlayer.getState();
+    if (s.playing) {
+      localStorage.setItem(
+        SESSION_KEY,
+        JSON.stringify({ queue: s.queue, index: s.index, savedPos: engine.position() }),
+      );
+    }
+    if (s.sleepUntil && Date.now() >= s.sleepUntil) {
+      s.setSleep(0, false);
+      s.setPlaying(false);
+    }
+  }, 5000);
   if (isTauri) {
     listen("imm-request", () => emitOverlayState()).catch(() => undefined);
     listen<{ cmd: string; value?: number }>("imm-cmd", (e) => {
@@ -442,5 +481,16 @@ export function bindEngine() {
     navigator.mediaSession.setActionHandler("pause", () => usePlayer.getState().setPlaying(false));
     navigator.mediaSession.setActionHandler("nexttrack", () => usePlayer.getState().next());
     navigator.mediaSession.setActionHandler("previoustrack", () => usePlayer.getState().prev());
+    navigator.mediaSession.setActionHandler("seekto", (d) => {
+      if (d.seekTime != null) usePlayer.getState().seek(d.seekTime);
+    });
+    navigator.mediaSession.setActionHandler("seekbackward", () => {
+      const p = usePlayer.getState();
+      p.seek(Math.max(0, p.position - 10));
+    });
+    navigator.mediaSession.setActionHandler("seekforward", () => {
+      const p = usePlayer.getState();
+      p.seek(p.position + 10);
+    });
   }
 }

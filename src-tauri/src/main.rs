@@ -14,6 +14,7 @@ fn main() {
         .plugin(tauri_plugin_process::init())
         .manage(AppState {
             yt: immersio_core::yt::Yt::new(),
+            sc: immersio_core::sc::Sc::new(),
             http: reqwest::Client::new(),
             discord: std::sync::Mutex::new(commands::DiscordHolder {
                 id: String::new(),
@@ -43,6 +44,7 @@ fn main() {
             commands::yt_browse,
             commands::yt_stream,
             commands::yt_radio,
+            commands::sc_search,
             commands::import_playlist,
             commands::lyrics_fetch,
             commands::fetch_image,

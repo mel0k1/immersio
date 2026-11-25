@@ -12,8 +12,10 @@ interface SettingsState {
   glass: boolean;
   streamQuality: "high" | "low";
   rate: number;
+  pitchLock: boolean;
   lyricsOffsetMs: number;
   radioAuto: boolean;
+  discordOn: boolean;
   discordId: string;
   offlineCache: boolean;
   eqEnabled: boolean;
@@ -24,8 +26,10 @@ interface SettingsState {
   setGlass: (v: boolean) => void;
   setStreamQuality: (q: "high" | "low") => void;
   setRate: (r: number) => void;
+  setPitchLock: (v: boolean) => void;
   setLyricsOffset: (ms: number) => void;
   setRadioAuto: (v: boolean) => void;
+  setDiscordOn: (v: boolean) => void;
   setDiscordId: (v: string) => void;
   setOfflineCache: (v: boolean) => void;
   setEqEnabled: (v: boolean) => void;
@@ -41,8 +45,10 @@ export const useSettings = create<SettingsState>()(
       glass: true,
       streamQuality: "high",
       rate: 1,
+      pitchLock: true,
       lyricsOffsetMs: 0,
       radioAuto: true,
+      discordOn: true,
       discordId: "",
       offlineCache: true,
       eqEnabled: false,
@@ -53,8 +59,10 @@ export const useSettings = create<SettingsState>()(
       setGlass: (glass) => set({ glass }),
       setStreamQuality: (streamQuality) => set({ streamQuality }),
       setRate: (rate) => set({ rate }),
+      setPitchLock: (pitchLock) => set({ pitchLock }),
       setLyricsOffset: (lyricsOffsetMs) => set({ lyricsOffsetMs }),
       setRadioAuto: (radioAuto) => set({ radioAuto }),
+      setDiscordOn: (discordOn) => set({ discordOn }),
       setDiscordId: (discordId) => set({ discordId }),
       setOfflineCache: (offlineCache) => set({ offlineCache }),
       setEqEnabled: (eqEnabled) => set({ eqEnabled }),
@@ -182,6 +190,8 @@ interface PlayerState {
   blocked: boolean;
   fullscreen: boolean;
   queueOpen: boolean;
+  sleepUntil: number;
+  sleepEnd: boolean;
   playContext: (tracks: Playable[], start: number) => void;
   toggle: () => void;
   next: () => void;
@@ -202,6 +212,7 @@ interface PlayerState {
   setQueueOpen: (v: boolean) => void;
   setPlaying: (v: boolean) => void;
   setPosition: (p: number, d: number) => void;
+  setSleep: (until: number, atEnd: boolean) => void;
   setError: (e: string | null, blocked?: boolean) => void;
   setLoading: (v: boolean) => void;
 }
@@ -226,6 +237,8 @@ export const usePlayer = create<PlayerState>()(
       blocked: false,
       fullscreen: false,
       queueOpen: false,
+      sleepUntil: 0,
+      sleepEnd: false,
       playContext: (tracks, start) => {
         set({ queue: tracks, index: start, error: null, blocked: false });
         audioBind?.(get());
@@ -310,7 +323,10 @@ export const usePlayer = create<PlayerState>()(
         set({ index: i, position: 0, error: null });
         audioBind?.(get());
       },
-      clearQueue: () => set({ queue: [], index: 0, playing: false }),
+      clearQueue: () => {
+        localStorage.removeItem("imm-session");
+        set({ queue: [], index: 0, playing: false });
+      },
       startRadio: async () => {
         const s = get();
         const cur = s.queue[s.index];
@@ -328,6 +344,7 @@ export const usePlayer = create<PlayerState>()(
       setQueueOpen: (v) => set({ queueOpen: v }),
       setPlaying: (v) => set({ playing: v }),
       setPosition: (position, duration) => set({ position, duration }),
+      setSleep: (sleepUntil, sleepEnd) => set({ sleepUntil, sleepEnd }),
       setError: (error, blocked = false) => set({ error, blocked }),
       setLoading: (loading) => set({ loading }),
     }),

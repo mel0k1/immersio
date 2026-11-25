@@ -1,4 +1,4 @@
-use crate::{Browse, CoreError, ItemKind, Result, TrackItem, yt::Yt};
+use crate::{Browse, CoreError, ItemKind, Result, TrackItem, sc::Sc, yt::Yt};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -64,13 +64,13 @@ fn path_id(url: &str, segment: &str, digits: bool) -> Option<String> {
     }
 }
 
-async fn parse(yt: &Yt, http: &Client, url: &str, hl: &str) -> Result<Parsed> {
+async fn parse(yt: &Yt, sc: &Sc, http: &Client, url: &str, hl: &str) -> Result<Parsed> {
     let url = url.trim();
     if url.contains("spotify.com") {
         return spotify(http, url).await;
     }
     if url.contains("soundcloud.com") {
-        return soundcloud(http, url).await;
+        return soundcloud(sc, http, url).await;
     }
     if url.contains("deezer.com") || url.contains("page.link") {
         return deezer(http, url).await;
@@ -241,8 +241,8 @@ async fn match_tracks(yt: &Yt, sources: Vec<SourceTrack>, hl: &str) -> (Vec<Trac
     (out, failed)
 }
 
-pub async fn resolve(yt: &Yt, http: &Client, url: &str, hl: &str) -> Result<ImportResult> {
-    let parsed = parse(yt, http, url, hl).await?;
+pub async fn resolve(yt: &Yt, sc: &Sc, http: &Client, url: &str, hl: &str) -> Result<ImportResult> {
+    let parsed = parse(yt, sc, http, url, hl).await?;
     let (tracks, failed) = if parsed.to_match.is_empty() {
         (parsed.ready, 0)
     } else {
@@ -254,72 +254,8 @@ pub async fn resolve(yt: &Yt, http: &Client, url: &str, hl: &str) -> Result<Impo
     Ok(ImportResult { kind: parsed.kind, name: parsed.name, tracks, failed })
 }
 
-static SC_CLIENT_ID: std::sync::OnceLock<String> = std::sync::OnceLock::new();
-
-fn js_find_client_id(js: &str) -> Option<String> {
-    for marker in ["client_id:\"", "\"client_id\":\""] {
-        let mut search = js;
-        while let Some(i) = search.find(marker) {
-            let rest = &search[i + marker.len()..];
-            let id: String = rest.chars().take_while(|c| c.is_ascii_alphanumeric()).collect();
-            if (25..=40).contains(&id.len()) {
-                return Some(id);
-            }
-            search = rest;
-        }
-    }
-    None
-}
-
-async fn sc_client_id(http: &Client) -> Result<String> {
-    if let Some(id) = SC_CLIENT_ID.get() {
-        return Ok(id.clone());
-    }
-    let ua = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36";
-    let html = http
-        .get("https://soundcloud.com/")
-        .header("User-Agent", ua)
-        .send()
-        .await?
-        .error_for_status()?
-        .text()
-        .await?;
-    let mut assets = Vec::new();
-    let mut rest = html.as_str();
-    while let Some(i) = rest.find("https://a-v2.sndcdn.com/assets/") {
-        let tail = &rest[i..];
-        let end = tail.find('"').unwrap_or(tail.len());
-        let asset = &tail[..end];
-        if asset.ends_with(".js") {
-            assets.push(asset.to_string());
-        }
-        rest = &tail[end..];
-    }
-    let mut found = None;
-    for asset in assets.iter().rev().take(4) {
-        let Ok(js) = http
-            .get(asset)
-            .header("User-Agent", ua)
-            .send()
-            .await?
-            .error_for_status()?
-            .text()
-            .await
-        else {
-            continue;
-        };
-        if let Some(id) = js_find_client_id(&js) {
-            found = Some(id);
-            break;
-        }
-    }
-    let id = found.ok_or_else(|| CoreError::Blocked("soundcloud client_id".into()))?;
-    let _ = SC_CLIENT_ID.set(id.clone());
-    Ok(id)
-}
-
-async fn soundcloud(http: &Client, url: &str) -> Result<Parsed> {
-    let cid = sc_client_id(http).await?;
+async fn soundcloud(sc: &Sc, http: &Client, url: &str) -> Result<Parsed> {
+    let cid = sc.client_id(http).await?;
     let val: Value = http
         .get("https://api-v2.soundcloud.com/resolve")
         .query(&[("url", url), ("client_id", cid.as_str())])

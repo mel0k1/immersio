@@ -54,8 +54,15 @@ fn cache_dir(app: &AppHandle) -> Option<PathBuf> {
 }
 
 fn cache_path(dir: &PathBuf, video_id: &str, mime: &str) -> PathBuf {
-    let ext = if mime.contains("webm") { "webm" } else { "m4a" };
-    dir.join(format!("{video_id}.{ext}"))
+    let ext = if mime.contains("webm") { "webm" } else if mime.contains("mpeg") { "mp3" } else { "m4a" };
+    let id = video_id.replace(':', "-");
+    dir.join(format!("{id}.{ext}"))
+}
+
+pub fn cache_file(app: &AppHandle, video_id: &str, mime: &str) -> Option<PathBuf> {
+    let dir = app.path().app_data_dir().ok()?.join("cache");
+    std::fs::create_dir_all(&dir).ok()?;
+    Some(cache_path(&dir, video_id, mime))
 }
 
 fn trim_cache(dir: &PathBuf, max_bytes: u64) {

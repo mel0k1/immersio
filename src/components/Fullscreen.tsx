@@ -184,7 +184,7 @@ export function Fullscreen() {
         </div>
         <div className="fs-titles">
           <div className="fs-title">{track?.title}</div>
-          <div className="fs-artist">{track?.artists.join(", ")}</div>
+          <div className="fs-artist">{track?.artists.join(", ") || (track?.videoId?.startsWith("sc:") ? "SoundCloud" : "")}</div>
         </div>
         <div className="fs-controls">
           <div className="fs-progress">

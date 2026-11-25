@@ -44,6 +44,8 @@ pub struct TrackItem {
     pub duration_secs: Option<u32>,
     pub thumbs: Vec<Thumb>,
     pub explicit: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub url: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -163,4 +165,5 @@ pub struct LocalTrack {
 pub mod importer;
 pub mod lyrics;
 pub mod local;
+pub mod sc;
 pub mod yt;

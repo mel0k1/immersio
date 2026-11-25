@@ -1021,6 +1021,7 @@ img {
 }
 .fs-artist {
   color: rgba(255, 255, 255, 0.65);
+  font-size: 13px;
   margin-top: 3px;
 }
 .fs-controls {

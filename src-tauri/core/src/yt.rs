@@ -284,6 +284,7 @@ fn parse_song_row(row: &Value) -> Option<TrackItem> {
         duration_secs: duration,
         thumbs: pick_thumbs(row),
         explicit: explicit_of(row),
+        url: None,
     })
 }
 
@@ -833,6 +834,7 @@ impl Yt {
                 duration_secs: dur,
                 thumbs: pick_thumbs(r),
                 explicit: false,
+                url: None,
             });
         }
         if out.is_empty() {

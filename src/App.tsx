@@ -91,6 +91,19 @@ function Shortcuts() {
         p.setFullscreen(!p.fullscreen);
       } else if (e.code === "KeyM") {
         p.toggleMute();
+      } else if (e.code === "KeyL") {
+        const t = p.queue[p.index];
+        if (t?.videoId) {
+          useLibrary.getState().toggleLike({
+            videoId: t.videoId,
+            title: t.title,
+            artists: t.artists,
+            album: t.album ?? null,
+            durationSecs: t.durationSecs ?? null,
+            thumbs: [],
+            explicit: !!t.explicit,
+          });
+        }
       } else if (e.code === "KeyN") {
         p.next();
       } else if (e.code === "KeyB") {

@@ -68,17 +68,20 @@ export function TrackRow({ raw, track, index, queue, onRemove, showAlbumLink = t
       icon: Link2,
       label: t("copyLink"),
       onClick: () => {
-        navigator.clipboard.writeText(`https://music.youtube.com/watch?v=${raw.videoId}`).then(() => showToast(t("linkCopied")));
+        const link = raw.videoId.startsWith("sc:") ? raw.url : `https://music.youtube.com/watch?v=${raw.videoId}`;
+        if (!link) return;
+        navigator.clipboard.writeText(link).then(() => showToast(t("linkCopied")));
       },
     });
     items.push({
       icon: Download,
       label: t("download"),
       onClick: async () => {
+        const ext = raw.videoId.startsWith("sc:") ? "mp3" : "m4a";
         try {
           const path = await save({
-            defaultPath: `${raw.artists[0] ?? ""} - ${raw.title}.m4a`.replace(/[\\/:*?"<>|]/g, "_"),
-            filters: [{ name: "Audio", extensions: ["m4a", "webm"] }],
+            defaultPath: `${raw.artists[0] ?? ""} - ${raw.title}.${ext}`.replace(/[\\/:*?"<>|]/g, "_"),
+            filters: [{ name: "Audio", extensions: [ext, "webm"] }],
           });
           if (!path) return;
           showToast(t("downloading"));

@@ -6,6 +6,7 @@ use tauri::{AppHandle, State};
 
 pub struct AppState {
     pub yt: immersio_core::yt::Yt,
+    pub sc: immersio_core::sc::Sc,
     pub http: reqwest::Client,
     pub discord: std::sync::Mutex<DiscordHolder>,
 }
@@ -26,19 +27,36 @@ pub async fn yt_browse(state: State<'_, AppState>, browse_id: String, hl: String
 }
 
 #[tauri::command]
-pub async fn yt_stream(state: State<'_, AppState>, video_id: String, hl: String, quality: Option<String>) -> Result<StreamInfo, String> {
+pub async fn sc_search(state: State<'_, AppState>, query: String) -> Result<Vec<TrackItem>, String> {
+    state.sc.search(&state.http, &query).await.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn yt_stream(app: AppHandle, state: State<'_, AppState>, video_id: String, hl: String, quality: Option<String>) -> Result<StreamInfo, String> {
+    if let Some(id) = video_id.strip_prefix("sc:") {
+        let (info, data) = state.sc.stream(&state.http, id).await.map_err(|e| e.to_string())?;
+        if let Some(bytes) = data {
+            if let Some(path) = crate::stream::cache_file(&app, &video_id, &info.mime) {
+                let _ = fs::write(&path, &bytes);
+            }
+        }
+        return Ok(info);
+    }
     let q = quality.as_deref().unwrap_or("high");
     state.yt.stream(&video_id, &hl, q).await.map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 pub async fn yt_radio(state: State<'_, AppState>, video_id: String, hl: String) -> Result<Vec<TrackItem>, String> {
+    if let Some(id) = video_id.strip_prefix("sc:") {
+        return state.sc.related(&state.http, id).await.map_err(|e| e.to_string());
+    }
     state.yt.radio(&video_id, &hl).await.map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 pub async fn import_playlist(state: State<'_, AppState>, url: String, hl: String) -> Result<ImportResult, String> {
-    immersio_core::importer::resolve(&state.yt, &state.http, &url, &hl)
+    immersio_core::importer::resolve(&state.yt, &state.sc, &state.http, &url, &hl)
         .await
         .map_err(|e| e.to_string())
 }
@@ -95,6 +113,15 @@ pub fn cache_clear(app: AppHandle) -> Result<(), String> {
 
 #[tauri::command]
 pub async fn download_track(state: State<'_, AppState>, video_id: String, hl: String, path: String) -> Result<(), String> {
+    if let Some(id) = video_id.strip_prefix("sc:") {
+        let (info, data) = state.sc.stream(&state.http, id).await.map_err(|e| e.to_string())?;
+        if let Some(bytes) = data {
+            return fs::write(&path, &bytes).map_err(|e| e.to_string());
+        }
+        let mut req = state.http.get(&info.url).header("User-Agent", "Mozilla/5.0");
+        let bytes = req.send().await.map_err(|e| e.to_string())?.bytes().await.map_err(|e| e.to_string())?;
+        return fs::write(&path, &bytes).map_err(|e| e.to_string());
+    }
     let info = state.yt.stream(&video_id, &hl, "high").await.map_err(|e| e.to_string())?;
     let mut req = state.http.get(&info.url).header("User-Agent", "Mozilla/5.0");
     if let Some(cookie) = state.yt.cookies() {
@@ -113,6 +140,7 @@ pub async fn lyrics_fetch(
     duration: Option<u32>,
     video_id: Option<String>,
 ) -> Result<Lyrics, String> {
+    let video_id = video_id.filter(|v| !v.starts_with("sc:"));
     let mut urls: Vec<String> = Vec::new();
     if let Some(vid) = video_id.as_deref().filter(|s| !s.is_empty()) {
         urls = state.yt.captions_urls(vid).await;

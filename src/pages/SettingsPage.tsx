@@ -21,9 +21,9 @@ function fmtSize(bytes: number): string {
 export function SettingsPage() {
   const t = useT();
   const {
-    lang, accent, setLang, setAccent, theme, setTheme, glass, setGlass, streamQuality, rate, radioAuto, discordId,
-    offlineCache, eqEnabled, eqGains,
-    setStreamQuality, setRate, setRadioAuto, setDiscordId, setOfflineCache, setEqEnabled, setEqGains,
+    lang, accent, setLang, setAccent, theme, setTheme, glass, setGlass, streamQuality, rate, pitchLock, radioAuto,
+    discordOn, discordId, offlineCache, eqEnabled, eqGains,
+    setStreamQuality, setRate, setPitchLock, setRadioAuto, setDiscordOn, setDiscordId, setOfflineCache, setEqEnabled, setEqGains,
   } = useSettings();
   const showToast = useUi((s) => s.showToast);
   const clearAll = useLibrary((s) => s.clearAll);
@@ -214,6 +214,15 @@ export function SettingsPage() {
               )}
               <div className="settings-row">
                 <div>
+                  <div className="settings-label">{t("pitchLock")}</div>
+                  <div className="settings-desc">{t("pitchLockDesc")}</div>
+                </div>
+                <button className={`btn${pitchLock ? " accent" : ""}`} onClick={() => setPitchLock(!pitchLock)}>
+                  {pitchLock ? "ON" : "OFF"}
+                </button>
+              </div>
+              <div className="settings-row">
+                <div>
                   <div className="settings-label">{t("ytCookies")}</div>
                   <div className="settings-desc">{t("ytCookiesDesc")}</div>
                 </div>
@@ -250,18 +259,29 @@ export function SettingsPage() {
               </div>
               <div className="settings-row">
                 <div>
-                  <div className="settings-label">{t("discordId")}</div>
+                  <div className="settings-label">{t("discord")}</div>
                   <div className="settings-desc">{t("discordDesc")}</div>
                 </div>
-                <input
-                  className="field"
-                  style={{ width: 240, marginBottom: 0 }}
-                  placeholder="1234567890"
-                  value={discordInput}
-                  onChange={(e) => setDiscordInput(e.target.value.replace(/[^0-9]/g, ""))}
-                  onBlur={() => setDiscordId(discordInput)}
-                />
+                <button className={`btn${discordOn ? " accent" : ""}`} onClick={() => setDiscordOn(!discordOn)}>
+                  {discordOn ? "ON" : "OFF"}
+                </button>
               </div>
+              {discordOn && (
+                <div className="settings-row">
+                  <div>
+                    <div className="settings-label">{t("discordId")}</div>
+                    <div className="settings-desc">{t("discordIdDesc")}</div>
+                  </div>
+                  <input
+                    className="field"
+                    style={{ width: 240, marginBottom: 0 }}
+                    placeholder="1234567890"
+                    value={discordInput}
+                    onChange={(e) => setDiscordInput(e.target.value.replace(/[^0-9]/g, ""))}
+                    onBlur={() => setDiscordId(discordInput)}
+                  />
+                </div>
+              )}
               <div className="settings-row">
                 <div>
                   <div className="settings-label">{t("shortcuts")}</div>

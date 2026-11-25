@@ -1,8 +1,10 @@
-import { Heart, ListMusic, Mic2, Pause, PictureInPicture2, Play, Repeat, Repeat1, Shuffle, SkipBack, SkipForward, Volume1, Volume2, VolumeX } from "lucide-react";
+import { Clock, Heart, ListMusic, Mic2, Pause, PictureInPicture2, Play, Repeat, Repeat1, Shuffle, SkipBack, SkipForward, Volume1, Volume2, VolumeX } from "lucide-react";
+import { useState } from "react";
 import { useLibrary, usePlayer } from "../lib/store";
 import { useT } from "../lib/i18n";
 import { fmtTime } from "../lib/format";
 import { Cover } from "./Cover";
+import { Menu, type MenuItem } from "./Menu";
 import { toggleOverlay } from "../lib/overlay";
 import type { CSSProperties } from "react";
 
@@ -28,6 +30,20 @@ export function PlayerBar() {
     usePlayer.getState();
   const liked = useLibrary((s) => (track?.videoId ? s.liked.some((x) => x.videoId === track.videoId) : false));
   const toggleLike = useLibrary((s) => s.toggleLike);
+  const sleepUntil = usePlayer((s) => s.sleepUntil);
+  const sleepEnd = usePlayer((s) => s.sleepEnd);
+  const setSleep = usePlayer((s) => s.setSleep);
+  const [sleepMenu, setSleepMenu] = useState<{ x: number; y: number } | null>(null);
+  const sleepItems: MenuItem[] = [
+    { label: t("sleepOff"), onClick: () => setSleep(0, false) },
+    ...[15, 30, 60].map((m) => ({ label: `${m} min`, onClick: () => setSleep(Date.now() + m * 60000, false) })),
+    { label: t("sleepEnd"), onClick: () => setSleep(0, true) },
+  ];
+  const sleepTitle = sleepEnd
+    ? t("sleepEnd")
+    : sleepUntil
+      ? `${t("sleepTimer")}: ${Math.max(1, Math.ceil((sleepUntil - Date.now()) / 60000))} min`
+      : t("sleepTimer");
   const dur = duration || 0;
   const VolIcon = muted || volume === 0 ? VolumeX : volume < 0.5 ? Volume1 : Volume2;
 
@@ -85,6 +101,9 @@ export function PlayerBar() {
         <button className={`icon-btn${repeat !== "off" ? " active" : ""}`} onClick={cycleRepeat} title={repeat}>
           {repeat === "one" ? <Repeat1 size={18} /> : <Repeat size={18} />}
         </button>
+        <button className={`icon-btn${sleepUntil || sleepEnd ? " active" : ""}`} onClick={(e) => setSleepMenu({ x: e.clientX, y: e.clientY })} title={sleepTitle}>
+          <Clock size={18} />
+        </button>
         <button className={`icon-btn${queueOpen ? " active-solid" : ""}`} onClick={() => setQueueOpen(!queueOpen)} title={t("queue")}>
           <ListMusic size={18} />
         </button>
@@ -101,6 +120,7 @@ export function PlayerBar() {
           <Mic2 size={18} />
         </button>
       </div>
+      {sleepMenu && <Menu x={sleepMenu.x} y={sleepMenu.y} items={sleepItems} onClose={() => setSleepMenu(null)} />}
     </footer>
   );
 }

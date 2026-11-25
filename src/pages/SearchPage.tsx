@@ -7,7 +7,7 @@ import { useT } from "../lib/i18n";
 import { TrackRow } from "../components/TrackRow";
 import { CollectionCard } from "../components/Cards";
 
-const TABS = ["all", "track", "video", "album", "artist", "playlist"] as const;
+const TABS = ["all", "track", "video", "album", "artist", "playlist", "soundcloud"] as const;
 type Tab = (typeof TABS)[number];
 
 const HISTORY_KEY = "imm-search-history";
@@ -27,6 +27,7 @@ export function SearchPage() {
   const urlQ = params.get("q") || "";
   const [input, setInput] = useState(urlQ);
   const [res, setRes] = useState<SearchResults | null>(null);
+  const [sc, setSc] = useState<TrackItem[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [tab, setTab] = useState<Tab>("all");
   const [history, setHistory] = useState<string[]>(loadHistory());
@@ -38,6 +39,7 @@ export function SearchPage() {
     setInput(q);
     setLoading(true);
     setRes(null);
+    setSc(null);
     const next = [q, ...history.filter((h) => h !== q)].slice(0, 8);
     setHistory(next);
     localStorage.setItem(HISTORY_KEY, JSON.stringify(next));
@@ -46,6 +48,10 @@ export function SearchPage() {
       .then(setRes)
       .catch(() => setRes({ shelves: [] }))
       .finally(() => setLoading(false));
+    api
+      .searchSoundcloud(q)
+      .then(setSc)
+      .catch(() => setSc([]));
   };
 
   useEffect(() => {
@@ -58,7 +64,8 @@ export function SearchPage() {
   }, [urlQ]);
 
   const shelves = res?.shelves ?? [];
-  const kindsAvailable = new Set(shelves.map((s) => s.kind));
+  const kindsAvailable = new Set<string>(shelves.map((s) => s.kind));
+  const scTracks = sc ?? [];
   const tracksOf = (kind: "track" | "video"): TrackItem[] => {
     const s = shelves.filter((x) => x.kind === kind);
     return s.flatMap((x) => x.tracks);
@@ -108,9 +115,9 @@ export function SearchPage() {
       {urlQ && (
         <>
           <div className="pills" style={{ margin: "22px 0 18px" }}>
-            {TABS.filter((tb) => tb === "all" || kindsAvailable.has(tb)).map((tb) => (
+            {TABS.filter((tb) => tb === "all" || kindsAvailable.has(tb) || (tb === "soundcloud" && scTracks.length > 0)).map((tb) => (
               <button key={tb} className={`pill${tab === tb ? " active" : ""}`} onClick={() => setTab(tb)}>
-                {tb === "all" ? t("resultsAll") : t(tb === "track" ? "tracks" : tb === "artist" ? "artists" : tb)}
+                {tb === "all" ? t("resultsAll") : tb === "soundcloud" ? t("soundcloud") : t(tb === "track" ? "tracks" : tb === "artist" ? "artists" : (tb as string))}
               </button>
             ))}
           </div>
@@ -173,12 +180,28 @@ export function SearchPage() {
                   ))}
                 </div>
               )}
+              {(tab === "all" || tab === "soundcloud") && scTracks.length > 0 && (
+                <>
+                  {tab === "all" && <div className="section-title" style={{ marginTop: 20 }}>{t("soundcloud")}</div>}
+                  <div className="track-list" style={{ marginTop: tab === "all" ? 10 : 10 }}>
+                    {scTracks.slice(0, tab === "all" ? 3 : undefined).map((tr, i) => (
+                      <TrackRow key={tr.videoId} raw={tr} track={playableOf(tr)} index={i} queue={scTracks.map(playableOf)} />
+                    ))}
+                  </div>
+                  {tab === "all" && scTracks.length > 3 && (
+                    <button className="pill" style={{ marginTop: 12 }} onClick={() => setTab("soundcloud")}>
+                      {t("soundcloud")} · {scTracks.length}
+                    </button>
+                  )}
+                </>
+              )}
               {!loading &&
                 tracksOf("track").length === 0 &&
                 tracksOf("video").length === 0 &&
                 collectionsOf("album").length === 0 &&
                 collectionsOf("artist").length === 0 &&
-                collectionsOf("playlist").length === 0 && <div className="state-block">{t("emptySearch")}</div>}
+                collectionsOf("playlist").length === 0 &&
+                scTracks.length === 0 && <div className="state-block">{t("emptySearch")}</div>}
             </>
           )}
         </>
