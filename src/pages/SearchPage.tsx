@@ -40,6 +40,7 @@ export function SearchPage() {
     setLoading(true);
     setRes(null);
     setSc(null);
+    setTab("all");
     const next = [q, ...history.filter((h) => h !== q)].slice(0, 8);
     setHistory(next);
     localStorage.setItem(HISTORY_KEY, JSON.stringify(next));
