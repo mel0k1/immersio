@@ -77,6 +77,52 @@ pub fn yt_set_cookies(app: AppHandle, state: State<'_, AppState>, cookies: Optio
     Ok(())
 }
 
+#[tauri::command]
+pub fn yt_set_pot(app: AppHandle, state: State<'_, AppState>, token: Option<String>) -> Result<(), String> {
+    state.yt.set_pot(token.clone());
+    let dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    let path = dir.join("pot.txt");
+    match token.filter(|s| !s.trim().is_empty()) {
+        Some(t) => fs::write(&path, t.trim()).map_err(|e| e.to_string())?,
+        None => {
+            let _ = fs::remove_file(&path);
+        }
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn pot_provider_fetch(app: AppHandle, state: State<'_, AppState>, url: Option<String>) -> Result<(), String> {
+    let base = url
+        .filter(|u| !u.trim().is_empty())
+        .unwrap_or_else(|| "http://127.0.0.1:4416".into())
+        .trim_end_matches('/')
+        .to_string();
+    let binding = state.yt.visitor().unwrap_or_else(|| "default".into());
+    let client = reqwest::Client::new();
+    let resp = client
+        .get(format!("{base}/get_pot"))
+        .query(&[("content_binding", binding)])
+        .timeout(std::time::Duration::from_secs(10))
+        .send()
+        .await
+        .map_err(|e| format!("{base}: {e}"))?;
+    let val: serde_json::Value = resp.json().await.map_err(|e| e.to_string())?;
+    let token = val
+        .get("poToken")
+        .and_then(|x| x.as_str())
+        .map(|s| s.to_string())
+        .filter(|s| !s.is_empty())
+        .ok_or_else(|| "no poToken in response".to_string())?;
+    yt_set_pot(app, state, Some(token))
+}
+
+#[tauri::command]
+pub async fn yt_import_liked(state: State<'_, AppState>, hl: String) -> Result<Vec<TrackItem>, String> {
+    state.yt.import_liked(&hl).await.map_err(|e| e.to_string())
+}
+
 fn cache_dir_of(app: &AppHandle) -> Result<std::path::PathBuf, String> {
     let dir = app.path().app_data_dir().map_err(|e| e.to_string())?.join("cache");
     fs::create_dir_all(&dir).map_err(|e| e.to_string())?;

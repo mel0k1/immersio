@@ -32,6 +32,12 @@ fn main() {
                         app.state::<AppState>().yt.set_cookies(Some(c));
                     }
                 }
+                if let Ok(text) = std::fs::read_to_string(dir.join("pot.txt")) {
+                    let t = text.trim().to_string();
+                    if !t.is_empty() {
+                        app.state::<AppState>().yt.set_pot(Some(t));
+                    }
+                }
             }
             Ok(())
         })
@@ -55,6 +61,9 @@ fn main() {
             commands::scan_local_dir,
             commands::remove_local,
             commands::yt_set_cookies,
+            commands::yt_set_pot,
+            commands::pot_provider_fetch,
+            commands::yt_import_liked,
             commands::cache_stats,
             commands::cache_clear,
             commands::set_cache_limit,

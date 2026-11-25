@@ -48,6 +48,7 @@ pub struct Yt {
     http: Client,
     visitor: std::sync::Arc<RwLock<Option<String>>>,
     cookies: std::sync::Arc<RwLock<Option<String>>>,
+    pot: std::sync::Arc<RwLock<Option<String>>>,
 }
 
 fn pick_thumbs(v: &Value) -> Vec<Thumb> {
@@ -481,6 +482,7 @@ impl Yt {
             http,
             visitor: std::sync::Arc::new(RwLock::new(None)),
             cookies: std::sync::Arc::new(RwLock::new(None)),
+            pot: std::sync::Arc::new(RwLock::new(None)),
         }
     }
 
@@ -492,6 +494,20 @@ impl Yt {
 
     pub fn cookies(&self) -> Option<String> {
         self.cookies.read().ok().and_then(|g| g.clone())
+    }
+
+    pub fn set_pot(&self, token: Option<String>) {
+        if let Ok(mut guard) = self.pot.write() {
+            *guard = token.filter(|s| !s.trim().is_empty());
+        }
+    }
+
+    pub fn pot(&self) -> Option<String> {
+        self.pot.read().ok().and_then(|g| g.clone())
+    }
+
+    pub fn visitor(&self) -> Option<String> {
+        self.visitor.read().ok().and_then(|g| g.clone())
     }
 
     fn context(&self, idx: usize, hl: &str) -> Value {
@@ -513,11 +529,19 @@ impl Yt {
                     obj.insert("visitorData".into(), json!(vd));
                 }
             }
+            if idx == REMIX {
+                if let Some(tok) = self.pot() {
+                    obj.insert(
+                        "serviceIntegrityDimensions".into(),
+                        json!({"poToken": tok}),
+                    );
+                }
+            }
         }
         json!({"client": client})
     }
 
-    async fn post(&self, endpoint: &str, body: Value, idx: usize, hl: &str) -> Result<Value> {
+    async fn post_ex(&self, endpoint: &str, body: Value, idx: usize, hl: &str, auth: Option<&str>) -> Result<Value> {
         let c = &CLIENTS[idx];
         let mut body = body;
         if let Some(obj) = body.as_object_mut() {
@@ -533,6 +557,12 @@ impl Yt {
         if let Some(cookie) = self.cookies() {
             req = req.header("Cookie", cookie);
         }
+        if let Some(a) = auth {
+            req = req
+                .header("Authorization", a)
+                .header("X-Origin", "https://music.youtube.com")
+                .header("Origin", "https://music.youtube.com");
+        }
         let resp = req.json(&body).send().await?;
         let val: Value = resp.json().await?;
         if let Some(vd) = val.pointer("/responseContext/visitorData").and_then(|x| x.as_str()) {
@@ -541,6 +571,10 @@ impl Yt {
             }
         }
         Ok(val)
+    }
+
+    async fn post(&self, endpoint: &str, body: Value, idx: usize, hl: &str) -> Result<Value> {
+        self.post_ex(endpoint, body, idx, hl, None).await
     }
 
     pub async fn captions_urls(&self, video_id: &str) -> Vec<String> {
@@ -710,8 +744,12 @@ impl Yt {
     }
 
     pub async fn browse(&self, browse_id: &str, hl: &str) -> Result<Browse> {
+        self.browse_auth(browse_id, hl, None).await
+    }
+
+    pub async fn browse_auth(&self, browse_id: &str, hl: &str, auth: Option<&str>) -> Result<Browse> {
         let val = self
-            .post("browse", json!({"browseId": browse_id}), REMIX, hl)
+            .post_ex("browse", json!({"browseId": browse_id}), REMIX, hl, auth)
             .await?;
         if browse_id.starts_with("MPRE") {
             parse_album(&val, browse_id).map(Browse::Album)
@@ -720,6 +758,47 @@ impl Yt {
         } else {
             parse_playlist(&val, browse_id).map(Browse::Playlist)
         }
+    }
+
+    /// liked songs of the signed-in account: needs YouTube cookies (SAPISID)
+    pub async fn import_liked(&self, hl: &str) -> Result<Vec<TrackItem>> {
+        let cookie = self
+            .cookies()
+            .ok_or_else(|| CoreError::NotFound("cookies".into()))?;
+        let mut sapisid = None;
+        for part in cookie.split(';') {
+            let p = part.trim();
+            if let Some(v) = p.strip_prefix("SAPISID=") {
+                sapisid = Some(v.to_string());
+            } else if let Some(v) = p.strip_prefix("__Secure-3PAPISID=") {
+                if sapisid.is_none() {
+                    sapisid = Some(v.to_string());
+                }
+            }
+        }
+        let sapisid = sapisid.filter(|s| !s.is_empty()).ok_or_else(|| CoreError::NotFound("SAPISID".into()))?;
+        let ts = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+        let origin = "https://music.youtube.com";
+        let digest = {
+            use sha1::{Digest, Sha1};
+            let mut h = Sha1::new();
+            h.update(format!("{sapisid} {ts} {origin}"));
+            let out = h.finalize();
+            out.iter().map(|b| format!("{b:02x}")).collect::<String>()
+        };
+        let auth = format!("SAPISIDHASH {ts}_{digest}");
+        let browse = self.browse_auth("LM", hl, Some(&auth)).await?;
+        let out = match browse {
+            Browse::Playlist(p) => p.tracks,
+            _ => Vec::new(),
+        };
+        if out.is_empty() {
+            return Err(CoreError::NotFound("liked empty".into()));
+        }
+        Ok(out)
     }
 
     pub async fn stream(&self, video_id: &str, hl: &str, quality: &str) -> Result<StreamInfo> {
@@ -762,7 +841,12 @@ impl Yt {
                 } else {
                     audio.last().unwrap()
                 };
-                let url = best.get("url").and_then(|u| u.as_str()).unwrap().to_string();
+                let mut url = best.get("url").and_then(|u| u.as_str()).unwrap().to_string();
+                if let Some(tok) = self.pot() {
+                    if !url.contains("&pot=") {
+                        url = format!("{url}&potc=1&pot={tok}");
+                    }
+                }
                 let mime = best
                     .get("mimeType")
                     .and_then(|m| m.as_str())

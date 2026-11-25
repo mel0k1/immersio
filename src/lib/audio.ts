@@ -39,7 +39,7 @@ function loadYTApi(cb: () => void) {
   document.head.appendChild(s);
 }
 
-export const EQ_FREQS = [60, 230, 910, 3600, 14000];
+export const EQ_FREQS = [31, 62, 125, 250, 500, 1000, 2000, 4000, 8000, 16000];
 
 class Engine {
   el: HTMLAudioElement | null = null;
@@ -127,7 +127,7 @@ class Engine {
   applyEqGains() {
     if (!this.eqFilters) return;
     const s = useSettings.getState();
-    const gains = s.eqEnabled ? s.eqGains : [0, 0, 0, 0, 0];
+    const gains = s.eqEnabled ? s.eqGains : EQ_FREQS.map(() => 0);
     this.eqFilters.forEach((f, i) => {
       f.gain.value = gains[i] ?? 0;
     });

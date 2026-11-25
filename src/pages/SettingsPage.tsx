@@ -60,9 +60,12 @@ export function SettingsPage() {
   } = useSettings();
   const showToast = useUi((s) => s.showToast);
   const clearAll = useLibrary((s) => s.clearAll);
+  const addLiked = useLibrary((s) => s.addLiked);
   const [version, setVersion] = useState("");
   const [discordInput, setDiscordInput] = useState(discordId);
   const [cookieInput, setCookieInput] = useState("");
+  const [potInput, setPotInput] = useState("");
+  const [potProviderInput, setPotProviderInput] = useState("http://127.0.0.1:4416");
   const [cacheInfo, setCacheInfo] = useState<[number, number] | null>(null);
   const [tab, setTab] = useState<Tab>("appearance");
   const [recording, setRecording] = useState<string | null>(null);
@@ -281,10 +284,10 @@ export function SettingsPage() {
               {eqEnabled && (
                 <div className="settings-row">
                   <div style={{ flex: 1 }}>
-                    <div style={{ display: "flex", gap: 14 }}>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 14, rowGap: 18 }}>
                       {EQ_FREQS.map((f, i) => (
                         <div key={f} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
-                          <span style={{ fontSize: 11, color: "var(--text-dim)" }}>{eqGains[i]} dB</span>
+                          <span style={{ fontSize: 11, color: "var(--text-dim)" }}>{eqGains[i] ?? 0} dB</span>
                           <input
                             className="slider"
                             type="range"
@@ -292,9 +295,9 @@ export function SettingsPage() {
                             max={12}
                             step={1}
                             value={eqGains[i] ?? 0}
-                            style={{ width: 110, "--fill": `${(((eqGains[i] ?? 0) + 12) / 24) * 100}%` } as React.CSSProperties}
+                            style={{ width: 96, "--fill": `${(((eqGains[i] ?? 0) + 12) / 24) * 100}%` } as React.CSSProperties}
                             onChange={(e) => {
-                              const g = [...eqGains];
+                              const g = eqGains.length === EQ_FREQS.length ? [...eqGains] : [...eqGains, ...EQ_FREQS.slice(eqGains.length).map(() => 0)];
                               g[i] = Number(e.target.value);
                               setEqGains(g);
                             }}
@@ -341,6 +344,79 @@ export function SettingsPage() {
                     {t("save")}
                   </button>
                 </div>
+              </div>
+              <div className="settings-row">
+                <div>
+                  <div className="settings-label">{t("potManual")}</div>
+                  <div className="settings-desc">{t("potDesc")}</div>
+                </div>
+                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                  <input
+                    className="field"
+                    style={{ width: 260, marginBottom: 0 }}
+                    type="password"
+                    placeholder={t("potManual")}
+                    value={potInput}
+                    onChange={(e) => setPotInput(e.target.value)}
+                  />
+                  <button
+                    className="btn"
+                    onClick={() =>
+                      api
+                        .setPot(potInput.trim() ? potInput.trim() : null)
+                        .then(() => showToast(t("potSaved")))
+                        .catch((e) => showToast(String(e)))
+                    }
+                  >
+                    {t("save")}
+                  </button>
+                </div>
+              </div>
+              <div className="settings-row">
+                <div>
+                  <div className="settings-label">{t("potProvider")}</div>
+                  <div className="settings-desc">{t("potProviderDesc")}</div>
+                </div>
+                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                  <input
+                    className="field"
+                    style={{ width: 260, marginBottom: 0 }}
+                    placeholder="http://127.0.0.1:4416"
+                    value={potProviderInput}
+                    onChange={(e) => setPotProviderInput(e.target.value)}
+                  />
+                  <button
+                    className="btn"
+                    onClick={() =>
+                      api
+                        .potProvider(potProviderInput.trim() || null)
+                        .then(() => showToast(t("potOk")))
+                        .catch((e) => showToast(String(e)))
+                    }
+                  >
+                    {t("potGet")}
+                  </button>
+                </div>
+              </div>
+              <div className="settings-row">
+                <div>
+                  <div className="settings-label">{t("importLiked")}</div>
+                  <div className="settings-desc">{t("importLikedDesc")}</div>
+                </div>
+                <button
+                  className="btn"
+                  onClick={() =>
+                    api
+                      .importLiked()
+                      .then((tracks) => {
+                        addLiked(tracks);
+                        showToast(`${t("importLikedOk")}: ${tracks.length}`);
+                      })
+                      .catch((e) => showToast(String(e)))
+                  }
+                >
+                  {t("importLiked")}
+                </button>
               </div>
               <div className="settings-row">
                 <div>

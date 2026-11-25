@@ -83,7 +83,7 @@ export const useSettings = create<SettingsState>()(
       pauseOnDeviceChange: true,
       shortcuts: { ...DEFAULT_SHORTCUTS },
       eqEnabled: false,
-      eqGains: [0, 0, 0, 0, 0],
+      eqGains: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
       setLang: (lang) => set({ lang }),
       setAccent: (accent) => set({ accent }),
       setTheme: (theme) => set({ theme }),
@@ -115,6 +115,7 @@ interface LibraryState {
   localTracks: LocalTrack[];
   history: Playable[];
   toggleLike: (t: TrackItem) => void;
+  addLiked: (tracks: TrackItem[]) => void;
   isLiked: (videoId: string) => boolean;
   createPlaylist: (name: string) => UserPlaylist;
   deletePlaylist: (id: string) => void;
@@ -143,6 +144,11 @@ export const useLibrary = create<LibraryState>()(
             ? s.liked.filter((x) => x.videoId !== t.videoId)
             : [t, ...s.liked],
         })),
+      addLiked: (tracks) =>
+        set((s) => {
+          const ids = new Set(s.liked.map((x) => x.videoId));
+          return { liked: [...tracks.filter((t) => !ids.has(t.videoId)), ...s.liked] };
+        }),
       isLiked: (videoId) => get().liked.some((x) => x.videoId === videoId),
       createPlaylist: (name) => {
         const p: UserPlaylist = { id: `${Date.now()}`, name, createdAt: Date.now(), tracks: [] };

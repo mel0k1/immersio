@@ -1868,7 +1868,7 @@ dependencies = [
 
 [[package]]
 name = "immersio"
-version = "0.6.1"
+version = "0.7.0"
 dependencies = [
  "discord-rich-presence",
  "immersio-core",
@@ -1881,6 +1881,7 @@ dependencies = [
  "tauri-plugin-process",
  "tauri-plugin-updater",
  "tauri-plugin-window-state",
+ "tokio",
  "zbus",
 ]
 
@@ -1892,6 +1893,7 @@ dependencies = [
  "reqwest 0.12.28",
  "serde",
  "serde_json",
+ "sha1",
  "thiserror 2.0.21",
  "tokio",
 ]
