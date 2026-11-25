@@ -111,8 +111,13 @@ pub async fn lyrics_fetch(
     artist: String,
     album: Option<String>,
     duration: Option<u32>,
+    video_id: Option<String>,
 ) -> Result<Lyrics, String> {
-    immersio_core::lyrics::fetch(&state.http, &track, &artist, album.as_deref(), duration)
+    let mut urls: Vec<String> = Vec::new();
+    if let Some(vid) = video_id.as_deref().filter(|s| !s.is_empty()) {
+        urls = state.yt.captions_urls(vid).await;
+    }
+    immersio_core::lyrics::fetch(&state.http, &track, &artist, album.as_deref(), duration, &urls)
         .await
         .map_err(|e| e.to_string())
 }
