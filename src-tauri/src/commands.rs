@@ -1,4 +1,4 @@
-use immersio_core::{Browse, LocalTrack, Lyrics, SearchResults, StreamInfo};
+use immersio_core::{Browse, LocalTrack, Lyrics, SearchResults, StreamInfo, TrackItem};
 use std::fs;
 use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::Manager;
@@ -7,6 +7,12 @@ use tauri::{AppHandle, State};
 pub struct AppState {
     pub yt: immersio_core::yt::Yt,
     pub http: reqwest::Client,
+    pub discord: std::sync::Mutex<DiscordHolder>,
+}
+
+pub struct DiscordHolder {
+    pub id: String,
+    pub client: Option<discord_rich_presence::DiscordIpcClient>,
 }
 
 #[tauri::command]
@@ -20,8 +26,14 @@ pub async fn yt_browse(state: State<'_, AppState>, browse_id: String, hl: String
 }
 
 #[tauri::command]
-pub async fn yt_stream(state: State<'_, AppState>, video_id: String, hl: String) -> Result<StreamInfo, String> {
-    state.yt.stream(&video_id, &hl).await.map_err(|e| e.to_string())
+pub async fn yt_stream(state: State<'_, AppState>, video_id: String, hl: String, quality: Option<String>) -> Result<StreamInfo, String> {
+    let q = quality.as_deref().unwrap_or("high");
+    state.yt.stream(&video_id, &hl, q).await.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn yt_radio(state: State<'_, AppState>, video_id: String, hl: String) -> Result<Vec<TrackItem>, String> {
+    state.yt.radio(&video_id, &hl).await.map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -116,4 +128,62 @@ pub async fn remove_local(tracks: Vec<LocalTrack>) -> Result<(), String> {
 #[tauri::command]
 pub fn app_version() -> String {
     env!("CARGO_PKG_VERSION").to_string()
+}
+
+#[tauri::command]
+pub fn discord_update(
+    state: State<'_, AppState>,
+    client_id: String,
+    title: String,
+    artist: String,
+    cover: Option<String>,
+    elapsed: Option<u32>,
+    remaining: Option<u32>,
+) -> Result<(), String> {
+    use discord_rich_presence::{activity, DiscordIpc, DiscordIpcClient};
+    if client_id.is_empty() {
+        if let Ok(mut holder) = state.discord.lock() {
+            if let Some(mut c) = holder.client.take() {
+                let _ = c.clear_activity();
+            }
+            holder.id.clear();
+        }
+        return Ok(());
+    }
+    let mut holder = state.discord.lock().map_err(|e| e.to_string())?;
+    if holder.id != client_id || holder.client.is_none() {
+        if let Some(mut old) = holder.client.take() {
+            let _ = old.clear_activity();
+        }
+        let mut client = DiscordIpcClient::new(&client_id).map_err(|e| e.to_string())?;
+        client.connect().map_err(|e| e.to_string())?;
+        holder.client = Some(client);
+        holder.id = client_id;
+    }
+    let client = holder.client.as_mut().unwrap();
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs() as i64;
+    let cover_url = cover;
+    let mut act = activity::Activity::new().details(&title).state(&artist);
+    if let (Some(el), Some(rem)) = (elapsed, remaining) {
+        act = act.timestamps(activity::Timestamps::new().start(now - el as i64).end(now + rem as i64));
+    }
+    if let Some(u) = cover_url.as_deref() {
+        act = act.assets(activity::Assets::new().large_image(u));
+    }
+    client.set_activity(act).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn discord_clear(state: State<'_, AppState>) -> Result<(), String> {
+    use discord_rich_presence::DiscordIpc;
+    if let Ok(mut holder) = state.discord.lock() {
+        if let Some(mut c) = holder.client.take() {
+            let _ = c.clear_activity();
+        }
+        holder.id.clear();
+    }
+    Ok(())
 }
