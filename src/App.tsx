@@ -182,6 +182,8 @@ function DropOverlay() {
 function Shell() {
   const accent = useSettings((s) => s.accent);
   const theme = useSettings((s) => s.theme);
+  const glass = useSettings((s) => s.glass);
+  const bgTrack = usePlayer((s) => s.queue[s.index]);
   const queueOpen = usePlayer((s) => s.queueOpen);
 
   useEffect(() => {
@@ -193,11 +195,21 @@ function Shell() {
   }, [theme]);
 
   useEffect(() => {
+    document.documentElement.dataset.glass = glass ? "on" : "off";
+  }, [glass]);
+
+  useEffect(() => {
     bindEngine();
   }, []);
 
   return (
-    <div className="app-frame">
+    <>
+      <div className="app-bg" key={bgTrack?.thumb ?? bgTrack?.coverPath ?? "none"}>
+        {glass && (bgTrack?.thumb || bgTrack?.coverPath) && (
+          <img src={bgTrack?.thumb ?? bgTrack?.coverPath ?? undefined} alt="" />
+        )}
+      </div>
+      <div className="app-frame">
       <DragRegion />
       <WindowControls />
       <Sidebar />
@@ -229,6 +241,7 @@ function Shell() {
       <Shortcuts />
       <HistoryPush />
     </div>
+    </>
   );
 }
 

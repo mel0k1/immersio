@@ -21,7 +21,7 @@ function fmtSize(bytes: number): string {
 export function SettingsPage() {
   const t = useT();
   const {
-    lang, accent, setLang, setAccent, theme, setTheme, streamQuality, rate, radioAuto, discordId,
+    lang, accent, setLang, setAccent, theme, setTheme, glass, setGlass, streamQuality, rate, radioAuto, discordId,
     offlineCache, eqEnabled, eqGains,
     setStreamQuality, setRate, setRadioAuto, setDiscordId, setOfflineCache, setEqEnabled, setEqGains,
   } = useSettings();
@@ -111,6 +111,17 @@ export function SettingsPage() {
                   </button>
                   <button className={theme === "light" ? "active" : ""} onClick={() => setTheme("light")}>
                     {t("themeLight")}
+                  </button>
+                </div>
+              </div>
+              <div className="settings-row">
+                <div className="settings-label">{t("glassStyle")}</div>
+                <div className="seg">
+                  <button className={glass ? "active" : ""} onClick={() => setGlass(true)}>
+                    {t("glassOn")}
+                  </button>
+                  <button className={!glass ? "active" : ""} onClick={() => setGlass(false)}>
+                    {t("glassOff")}
                   </button>
                 </div>
               </div>

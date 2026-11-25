@@ -9,6 +9,7 @@ interface SettingsState {
   lang: "ru" | "en";
   accent: string;
   theme: "dark" | "light";
+  glass: boolean;
   streamQuality: "high" | "low";
   rate: number;
   lyricsOffsetMs: number;
@@ -20,6 +21,7 @@ interface SettingsState {
   setLang: (l: "ru" | "en") => void;
   setAccent: (a: string) => void;
   setTheme: (t: "dark" | "light") => void;
+  setGlass: (v: boolean) => void;
   setStreamQuality: (q: "high" | "low") => void;
   setRate: (r: number) => void;
   setLyricsOffset: (ms: number) => void;
@@ -36,6 +38,7 @@ export const useSettings = create<SettingsState>()(
       lang: "ru",
       accent: "#7c5cff",
       theme: "dark",
+      glass: true,
       streamQuality: "high",
       rate: 1,
       lyricsOffsetMs: 0,
@@ -47,6 +50,7 @@ export const useSettings = create<SettingsState>()(
       setLang: (lang) => set({ lang }),
       setAccent: (accent) => set({ accent }),
       setTheme: (theme) => set({ theme }),
+      setGlass: (glass) => set({ glass }),
       setStreamQuality: (streamQuality) => set({ streamQuality }),
       setRate: (rate) => set({ rate }),
       setLyricsOffset: (lyricsOffsetMs) => set({ lyricsOffsetMs }),
