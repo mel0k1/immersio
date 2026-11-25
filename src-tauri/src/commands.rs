@@ -8,6 +8,7 @@ pub struct AppState {
     pub yt: immersio_core::yt::Yt,
     pub sc: immersio_core::sc::Sc,
     pub http: reqwest::Client,
+    pub cache_max: std::sync::RwLock<u64>,
     pub discord: std::sync::Mutex<DiscordHolder>,
 }
 
@@ -107,6 +108,30 @@ pub fn cache_clear(app: AppHandle) -> Result<(), String> {
         for e in entries.filter_map(|e| e.ok()) {
             let _ = fs::remove_file(e.path());
         }
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub fn set_cache_limit(state: State<'_, AppState>, limit: u64) {
+    if let Ok(mut g) = state.cache_max.write() {
+        *g = limit;
+    }
+}
+
+#[tauri::command]
+pub fn mpris_update(app: AppHandle, title: String, artist: String, art: String, len_us: u64, pos_us: u64, playing: bool) {
+    crate::mpris::update(&app, crate::mpris::Meta { title, artist, art, len_us, pos_us, playing });
+}
+
+#[tauri::command]
+pub fn set_window_icon(app: AppHandle, rgba: Vec<u8>, w: u32, h: u32) -> Result<(), String> {
+    if rgba.len() != (w as usize) * (h as usize) * 4 {
+        return Err("icon size mismatch".into());
+    }
+    let img = tauri::image::Image::new_owned(rgba, w, h);
+    for (_, win) in app.webview_windows() {
+        let _ = win.set_icon(img.clone());
     }
     Ok(())
 }

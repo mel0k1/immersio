@@ -173,6 +173,11 @@ pub async fn handle(app: &AppHandle, request: Request<Vec<u8>>) -> Response<Vec<
             builder = builder.header(key, v.clone());
         }
     }
+    let cache_max = app
+        .try_state::<crate::commands::AppState>()
+        .and_then(|s| s.cache_max.read().ok())
+        .map(|g| *g)
+        .unwrap_or(2_000_000_000);
 
     // 2. Fresh full download: cache to disk while responding.
     if range.is_none() && p.cache && !p.video_id.is_empty() && status == StatusCode::OK {
@@ -183,7 +188,9 @@ pub async fn handle(app: &AppHandle, request: Request<Vec<u8>>) -> Response<Vec<
         if let Some(dir) = cache_dir(app) {
             let path = cache_path(&dir, &p.video_id, &p.mime);
             let _ = std::fs::write(&path, &bytes);
-            trim_cache(&dir, 2_000_000_000);
+            if cache_max > 0 {
+                trim_cache(&dir, cache_max);
+            }
         }
         return ok_headers(&p.mime, bytes.len() as u64)
             .status(StatusCode::OK)

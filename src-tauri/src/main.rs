@@ -1,6 +1,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod commands;
+mod mpris;
 mod stream;
 
 use commands::AppState;
@@ -16,12 +17,14 @@ fn main() {
             yt: immersio_core::yt::Yt::new(),
             sc: immersio_core::sc::Sc::new(),
             http: reqwest::Client::new(),
+            cache_max: std::sync::RwLock::new(2_000_000_000),
             discord: std::sync::Mutex::new(commands::DiscordHolder {
                 id: String::new(),
                 client: None,
             }),
         })
         .setup(|app| {
+            mpris::init(app.handle());
             if let Ok(dir) = app.path().app_data_dir() {
                 if let Ok(text) = std::fs::read_to_string(dir.join("yt-cookies.txt")) {
                     let c = text.trim().to_string();
@@ -54,6 +57,9 @@ fn main() {
             commands::yt_set_cookies,
             commands::cache_stats,
             commands::cache_clear,
+            commands::set_cache_limit,
+            commands::mpris_update,
+            commands::set_window_icon,
             commands::download_track,
             commands::app_version,
             commands::discord_update,
