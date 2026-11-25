@@ -56,9 +56,13 @@ async fn main() {
                     Err(e) => println!("lyrics err: {e}"),
                 }
                 println!("stream: {:?}", t.video_id);
-                match yt.stream(&t.video_id, "ru").await {
+                match yt.stream(&t.video_id, "ru", "high").await {
                     Ok(s) => println!("stream ok: {} {}kbps", s.mime, s.bitrate.unwrap_or(0)),
                     Err(e) => println!("stream err: {e}"),
+                }
+                match yt.radio(&t.video_id, "ru").await {
+                    Ok(list) => println!("radio ok: {} tracks, first: {}", list.len(), list.first().map(|x| x.title.clone()).unwrap_or_default()),
+                    Err(e) => println!("radio err: {e}"),
                 }
             }
         }

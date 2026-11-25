@@ -660,7 +660,7 @@ impl Yt {
         }
     }
 
-    pub async fn stream(&self, video_id: &str, hl: &str) -> Result<StreamInfo> {
+    pub async fn stream(&self, video_id: &str, hl: &str, quality: &str) -> Result<StreamInfo> {
         let mut last_reason = String::new();
         for idx in 0..CLIENTS.len() {
             let val = self
@@ -695,7 +695,11 @@ impl Yt {
                     continue;
                 }
                 audio.sort_by_key(|f| f.get("bitrate").and_then(|b| b.as_u64()).unwrap_or(0));
-                let best = audio.last().unwrap();
+                let best = if quality == "low" {
+                    audio.first().unwrap()
+                } else {
+                    audio.last().unwrap()
+                };
                 let url = best.get("url").and_then(|u| u.as_str()).unwrap().to_string();
                 let mime = best
                     .get("mimeType")
@@ -726,6 +730,103 @@ impl Yt {
         } else {
             CoreError::NotFound(last_reason)
         })
+    }
+
+    pub async fn radio(&self, video_id: &str, hl: &str) -> Result<Vec<TrackItem>> {
+        let n1 = self
+            .post("next", json!({"videoId": video_id}), REMIX, hl)
+            .await?;
+        let rid = find_radio_playlist(&n1).ok_or_else(|| CoreError::NotFound("radio".into()))?;
+        let n2 = self
+            .post("next", json!({"playlistId": rid}), REMIX, hl)
+            .await?;
+        let mut nodes = Vec::new();
+        collect_nodes(&n2, "playlistPanelVideoRenderer", &mut nodes);
+        let mut out = Vec::new();
+        let mut seen = std::collections::HashSet::new();
+        for r in nodes {
+            let vid = r.get("videoId").and_then(|x| x.as_str()).unwrap_or("");
+            if vid.is_empty() || !seen.insert(vid.to_string()) {
+                continue;
+            }
+            let title = r
+                .pointer("/title/runs/0/text")
+                .and_then(|x| x.as_str())
+                .unwrap_or("");
+            if title.is_empty() {
+                continue;
+            }
+            let artist = r
+                .pointer("/shortBylineText/runs/0/text")
+                .and_then(|x| x.as_str())
+                .unwrap_or("");
+            let dur = r
+                .pointer("/lengthText/runs/0/text")
+                .and_then(|x| x.as_str())
+                .and_then(parse_dur);
+            out.push(TrackItem {
+                video_id: vid.to_string(),
+                title: title.to_string(),
+                artists: if artist.is_empty() { vec![] } else { vec![artist.to_string()] },
+                album: None,
+                duration_secs: dur,
+                thumbs: pick_thumbs(r),
+                explicit: false,
+            });
+        }
+        if out.is_empty() {
+            return Err(CoreError::NotFound("radio tracks".into()));
+        }
+        Ok(out)
+    }
+}
+
+fn find_radio_playlist(val: &Value) -> Option<String> {
+    fn walk(v: &Value, out: &mut Option<String>) {
+        if out.is_some() {
+            return;
+        }
+        if let Some(obj) = v.as_object() {
+            for (k, val) in obj {
+                if k == "playlistId" {
+                    if let Some(s) = val.as_str() {
+                        if s.starts_with("RD") {
+                            *out = Some(s.to_string());
+                            return;
+                        }
+                    }
+                }
+                walk(val, out);
+                if out.is_some() {
+                    return;
+                }
+            }
+        } else if let Some(arr) = v.as_array() {
+            for x in arr {
+                walk(x, out);
+                if out.is_some() {
+                    return;
+                }
+            }
+        }
+    }
+    let mut out = None;
+    walk(val, &mut out);
+    out
+}
+
+fn collect_nodes<'a>(v: &'a Value, key: &str, out: &mut Vec<&'a Value>) {
+    if let Some(obj) = v.as_object() {
+        for (k, val) in obj {
+            if k == key {
+                out.push(val);
+            }
+            collect_nodes(val, key, out);
+        }
+    } else if let Some(arr) = v.as_array() {
+        for x in arr {
+            collect_nodes(x, key, out);
+        }
     }
 }
 
