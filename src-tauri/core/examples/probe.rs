@@ -1,4 +1,5 @@
 use immersio_core::lyrics;
+use immersio_core::sc::Sc;
 use immersio_core::yt::Yt;
 
 #[tokio::main]
@@ -6,7 +7,7 @@ async fn main() {
     let yt = Yt::new();
     let http = reqwest::Client::new();
     if let Some(url) = std::env::args().nth(2) {
-        match immersio_core::importer::resolve(&yt, &http, &url, "ru").await {
+        match immersio_core::importer::resolve(&yt, &Sc::new(), &http, &url, "ru").await {
             Ok(r) => println!(
                 "import ok [{}]: {} — {} tracks (failed {}), first: {}",
                 r.kind,
