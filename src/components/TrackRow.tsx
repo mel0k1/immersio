@@ -118,9 +118,9 @@ export function TrackRow({ raw, track, index, queue, onRemove, showAlbumLink = t
         )}
       </div>
       <div className="tr-main" onDoubleClick={play}>
-        {track.thumb || track.coverPath ? (
+        <div className="tr-thumb-wrap">
           <Cover src={track.thumb ?? track.coverPath ?? undefined} />
-        ) : null}
+        </div>
         <div className="tr-titles">
           <div className="tr-title">
             <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{track.title}</span>

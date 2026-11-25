@@ -1452,3 +1452,37 @@ img {
   color: #ffffff;
   pointer-events: none;
 }
+
+/* Fixed-size cover inside track rows */
+.tr-thumb-wrap {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  overflow: hidden;
+  flex-shrink: 0;
+  background: var(--bg-soft);
+}
+.tr-thumb-wrap .cover-ph {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+}
+.tr-thumb-wrap .cover-ph svg {
+  width: 18px;
+  height: 18px;
+}
+.tr-thumb-wrap img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* Window controls embedded in the fullscreen top bar */
+.fs-top .win-controls {
+  position: static;
+}
+.fs-top .win-controls button {
+  border-radius: 8px;
+}

@@ -37,13 +37,30 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev patchelf libxdo-dev
       - run: npm ci
+      - name: Prepare updater signing
+        id: sign
+        shell: bash
+        run: |
+          if [ -n "${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}" ]; then
+            echo "has_key=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_key=false" >> $GITHUB_OUTPUT
+            echo "::warning::TAURI_SIGNING_PRIVATE_KEY secret is not set — updater artifacts are disabled for this build"
+          fi
+      - name: Disable updater artifacts without signing key
+        if: steps.sign.outputs.has_key == 'false'
+        run: |
+          node -e "const f='src-tauri/tauri.conf.json';const fs=require('fs');const j=JSON.parse(fs.readFileSync(f));j.bundle.createUpdaterArtifacts=false;fs.writeFileSync(f,JSON.stringify(j,null,2))"
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           tagName: ${{ github.ref_name }}
           releaseName: "Immersio ${{ github.ref_name }}"
           releaseBody: "Downloads for Windows, macOS (Intel and Apple Silicon) and Linux (deb, rpm, AppImage). macOS builds are unsigned."
           releaseDraft: false
           prerelease: false
+          includeUpdaterArtifacts: true
           args: ${{ matrix.args }}

@@ -6,6 +6,7 @@ import { useLibrary, usePlayer, useSettings } from "../lib/store";
 import { useT } from "../lib/i18n";
 import { fmtTime, hexToRgb } from "../lib/format";
 import { Cover } from "./Cover";
+import { WindowControls } from "./WindowControls";
 import { engine } from "../lib/audio";
 import type { CSSProperties } from "react";
 import type { LyricLine, LyricWord, Lyrics } from "../types";
@@ -173,7 +174,29 @@ export function Fullscreen() {
             {rate}×
           </button>
         </div>
-        <div className="win-controls" style={{ position: "static" }} />
+        <div style={{ display: "flex", gap: 8, alignItems: "center", zIndex: 4 }}>
+          {track?.videoId && (
+            <button
+              className={`icon-btn${liked ? " active" : ""}`}
+              onClick={() =>
+                track.videoId &&
+                toggleLike({
+                  videoId: track.videoId,
+                  title: track.title,
+                  artists: track.artists,
+                  album: track.album ?? null,
+                  durationSecs: track.durationSecs ?? null,
+                  thumbs: [],
+                  explicit: !!track.explicit,
+                })
+              }
+              title={liked ? t("unlike") : t("like")}
+            >
+              <Heart size={20} fill={liked ? "currentColor" : "none"} />
+            </button>
+          )}
+          <WindowControls />
+        </div>
       </div>
       <div className="fs-left">
         <div className="fs-cover-card">
@@ -213,25 +236,6 @@ export function Fullscreen() {
             <input className="slider" type="range" min={0} max={1} step={0.01} value={muted ? 0 : volume} style={fill(muted ? 0 : volume, 1)} onChange={(e) => setVolume(Number(e.target.value))} />
           </div>
         </div>
-        {track?.videoId && (
-          <button
-            className={`icon-btn fs-like${liked ? " active" : ""}`}
-            onClick={() =>
-              track.videoId &&
-              toggleLike({
-                videoId: track.videoId,
-                title: track.title,
-                artists: track.artists,
-                album: track.album ?? null,
-                durationSecs: track.durationSecs ?? null,
-                thumbs: [],
-                explicit: !!track.explicit,
-              })
-            }
-          >
-            <Heart size={20} fill={liked ? "currentColor" : "none"} />
-          </button>
-        )}
       </div>
       <div className="lyrics-pane">
         <div className="lyrics-scroll" ref={lyricsRef}>

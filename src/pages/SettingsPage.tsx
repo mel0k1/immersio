@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import { Palette, SlidersHorizontal, Info } from "lucide-react";
+import { check, type Update } from "@tauri-apps/plugin-updater";
+import { relaunch } from "@tauri-apps/plugin-process";
 import { useSettings, useLibrary, useUi } from "../lib/store";
 import { useT } from "../lib/i18n";
 import { api } from "../lib/ipc";
@@ -30,6 +32,30 @@ export function SettingsPage() {
   const [cookieInput, setCookieInput] = useState("");
   const [cacheInfo, setCacheInfo] = useState<[number, number] | null>(null);
   const [tab, setTab] = useState<Tab>("appearance");
+  const [updState, setUpdState] = useState<null | "checking" | "none" | "error" | "downloading" | "installed" | Update>(null);
+
+  async function checkForUpdate() {
+    setUpdState("checking");
+    try {
+      const u = await check();
+      setUpdState(u ?? "none");
+    } catch {
+      setUpdState("error");
+    }
+  }
+
+  async function installUpdate() {
+    const u = updState;
+    if (!u || typeof u === "string") return;
+    setUpdState("downloading");
+    try {
+      await u.downloadAndInstall();
+      setUpdState("installed");
+    } catch {
+      setUpdState("error");
+    }
+  }
+
   useEffect(() => {
     api.version().then(setVersion).catch(() => setVersion(""));
     api.cacheStats().then(setCacheInfo).catch(() => undefined);
@@ -255,8 +281,40 @@ export function SettingsPage() {
                 <div>
                   <div style={{ fontSize: 17, fontWeight: 750 }}>Immersio</div>
                   <div style={{ color: "var(--text-dim)", fontSize: 13 }}>
-                    {t("version")} {version || "0.4.0"}
+                    {t("version")} {version || "0.5.0"}
                   </div>
+                </div>
+              </div>
+              <div className="settings-row">
+                <div className="settings-label">{t("updateSection")}</div>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  {updState === "none" ? (
+                    <span style={{ color: "var(--text-dim)" }}>{t("updateNone")}</span>
+                  ) : updState === "checking" || updState === "downloading" ? (
+                    <span className="spin" />
+                  ) : updState === "installed" ? (
+                    <button className="pill" onClick={() => relaunch().catch(() => undefined)}>
+                      {t("updateRestart")}
+                    </button>
+                  ) : updState === "error" ? (
+                    <>
+                      <span style={{ color: "var(--text-dim)" }}>{t("updateError")}</span>
+                      <button className="pill" onClick={checkForUpdate}>
+                        {t("updateRetry")}
+                      </button>
+                    </>
+                  ) : updState && typeof updState !== "string" ? (
+                    <>
+                      <span style={{ color: "var(--text-dim)" }}>{t("updateAvailable")} {updState.version}</span>
+                      <button className="pill" onClick={installUpdate}>
+                        {t("updateDownload")}
+                      </button>
+                    </>
+                  ) : (
+                    <button className="pill" onClick={checkForUpdate}>
+                      {t("updateCheck")}
+                    </button>
+                  )}
                 </div>
               </div>
               <div className="settings-row">
