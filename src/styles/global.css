@@ -52,7 +52,7 @@
   background: linear-gradient(180deg, rgba(13, 13, 16, 0.5), rgba(13, 13, 16, 0.82));
 }
 [data-theme="light"] .app-bg::after {
-  background: linear-gradient(180deg, rgba(244, 244, 247, 0.5), rgba(244, 244, 247, 0.78));
+  background: linear-gradient(180deg, rgba(244, 244, 247, 0.55), rgba(244, 244, 247, 0.92));
 }
 
 * {
@@ -178,6 +178,9 @@ img {
   height: 34px;
   object-fit: contain;
 }
+[data-theme="light"] .side-logo img {
+  filter: brightness(0);
+}
 .side-btn {
   width: 44px;
   height: 44px;
@@ -206,6 +209,17 @@ img {
   min-height: 0;
   height: 100%;
   position: relative;
+}
+.main::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 52px;
+  background: linear-gradient(to bottom, var(--bg), transparent);
+  z-index: 30;
+  pointer-events: none;
 }
 
 .content {
@@ -593,6 +607,9 @@ img {
   z-index: -1;
   border-radius: inherit;
 }
+[data-theme="light"] .hero-glass {
+  background: rgba(255, 255, 255, 0.28);
+}
 .hero-top {
   display: flex;
   gap: 24px;
@@ -666,7 +683,7 @@ img {
 }
 .hero-actions .btn.primary {
   background: var(--text);
-  color: #0d0d10;
+  color: var(--bg);
 }
 
 .list-tools {
@@ -1258,8 +1275,10 @@ img {
 .menu {
   position: fixed;
   z-index: 86;
-  background: #1a1a20;
-  border: 1px solid var(--surface-2);
+  background: var(--bg-soft);
+  backdrop-filter: var(--panel-blur);
+  -webkit-backdrop-filter: var(--panel-blur);
+  border: 1px solid var(--panel-border);
   border-radius: 12px;
   padding: 6px;
   min-width: 210px;
@@ -1353,6 +1372,11 @@ img {
 
 .empty-cover {
   background: linear-gradient(135deg, #26262e, #131318);
+  color: #f4f4f6;
+}
+[data-theme="light"] .empty-cover {
+  background: linear-gradient(135deg, #ececf2, #d7d7e2);
+  color: #3a3a44;
 }
 
 .liked-cover {

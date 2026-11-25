@@ -175,26 +175,6 @@ export function Fullscreen() {
           </button>
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center", zIndex: 4 }}>
-          {track?.videoId && (
-            <button
-              className={`icon-btn${liked ? " active" : ""}`}
-              onClick={() =>
-                track.videoId &&
-                toggleLike({
-                  videoId: track.videoId,
-                  title: track.title,
-                  artists: track.artists,
-                  album: track.album ?? null,
-                  durationSecs: track.durationSecs ?? null,
-                  thumbs: [],
-                  explicit: !!track.explicit,
-                })
-              }
-              title={liked ? t("unlike") : t("like")}
-            >
-              <Heart size={20} fill={liked ? "currentColor" : "none"} />
-            </button>
-          )}
           <WindowControls />
         </div>
       </div>
@@ -225,6 +205,26 @@ export function Fullscreen() {
             <button className="icon-btn" onClick={next}>
               <SkipForward size={21} fill="currentColor" />
             </button>
+            {track?.videoId && (
+              <button
+                className={`icon-btn${liked ? " active" : ""}`}
+                onClick={() =>
+                  track.videoId &&
+                  toggleLike({
+                    videoId: track.videoId,
+                    title: track.title,
+                    artists: track.artists,
+                    album: track.album ?? null,
+                    durationSecs: track.durationSecs ?? null,
+                    thumbs: [],
+                    explicit: !!track.explicit,
+                  })
+                }
+                title={liked ? t("unlike") : t("like")}
+              >
+                <Heart size={19} fill={liked ? "currentColor" : "none"} />
+              </button>
+            )}
             <button className={`icon-btn${repeat !== "off" ? " active" : ""}`} onClick={cycleRepeat}>
               {repeat === "one" ? <Repeat1 size={19} /> : <Repeat size={19} />}
             </button>
