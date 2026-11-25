@@ -154,41 +154,44 @@ pub async fn fetch(
         plain: None,
         found: false,
     };
-    let mut url = format!(
-        "{BASE}/get?track_name={}&artist_name={}",
-        urlencode(track),
-        urlencode(artist)
-    );
-    if let (Some(a), Some(d)) = (album, duration_secs) {
-        url = format!("{url}&album_name={}&duration={d}", urlencode(a));
-    }
-    if let Ok(v) = get(client, &url).await {
-        out = from_obj(&v);
-    }
-    if !out.found {
-        let url = format!(
-            "{BASE}/search?track_name={}&artist_name={}",
-            urlencode(track),
-            urlencode(artist)
+    // Query ladder: exact /get first, then progressively looser searches. Russian
+    // and feat-heavy titles often miss the exact match, so strip decorations and
+    // try artist variants — this is what recovers most currently-missing lyrics.
+    let clean_track = clean_title(track);
+    let artist_variants = artist_variants(artist);
+    let mut tried_search = false;
+    // 1. /get with album+duration, 2. /get without album, then search variants.
+    for (i, art) in artist_variants.iter().enumerate() {
+        let name = if i == 0 && clean_track != track { &clean_track } else { &clean_track };
+        let mut url = format!(
+            "{BASE}/get?track_name={}&artist_name={}",
+            urlencode(name),
+            urlencode(art)
         );
+        if i == 0 {
+            if let (Some(a), Some(d)) = (album, duration_secs) {
+                url = format!("{url}&album_name={}&duration={d}", urlencode(a));
+            }
+        }
         if let Ok(v) = get(client, &url).await {
-            if let Some(arr) = v.as_array() {
-                let mut best: Option<&Value> = None;
-                for item in arr {
-                    if item.get("instrumental").and_then(|x| x.as_bool()).unwrap_or(false) {
-                        continue;
-                    }
-                    best = Some(item);
-                    if let (Some(want), Some(have)) = (duration_secs, item.get("duration").and_then(|d| d.as_f64())) {
-                        if (have as i64 - want as i64).abs() <= 2 {
-                            break;
-                        }
-                    }
-                }
-                if let Some(item) = best {
-                    out = from_obj(item);
+            out = from_obj(&v);
+            if out.found {
+                break;
+            }
+        }
+        if !tried_search {
+            tried_search = true;
+            if let Some(item) = search_best(client, &clean_track, art, duration_secs).await {
+                out = from_obj(&item);
+                if out.found {
+                    break;
                 }
             }
+        }
+    }
+    if !out.found {
+        if let Some(item) = search_best(client, &clean_track, "", duration_secs).await {
+            out = from_obj(&item);
         }
     }
     if out.synced.is_empty() && out.plain.is_none() {
@@ -196,6 +199,78 @@ pub async fn fetch(
     }
     out.found = true;
     Ok(out)
+}
+
+/// Strip noise that breaks exact matching: parentheses/brackets content like
+/// "(feat. X)", "[Official video]" — repeated until no brackets remain.
+fn clean_title(track: &str) -> String {
+    let mut s = track.to_string();
+    loop {
+        let Some(open) = s.find(['(', '[']) else { break };
+        let closer = if s.as_bytes().get(open) == Some(&b'(') { ')' } else { ']' };
+        let Some(end_rel) = s[open..].find(closer) else { break };
+        let end = open + end_rel + closer.len_utf8();
+        s = format!("{}{}", &s[..open], &s[end..]);
+    }
+    s.split_whitespace().collect::<Vec<_>>().join(" ")
+}
+
+/// Full artist string, then the first "main" artist (before feat/comma/&).
+fn artist_variants(artist: &str) -> Vec<String> {
+    let mut out = vec![artist.trim().to_string()];
+    let a = artist.to_lowercase();
+    for sep in [" feat.", " ft.", " feat ", ", ", " & ", " × ", " x ", "; "] {
+        if let Some(i) = a.find(sep) {
+            let first = artist[..i].trim().to_string();
+            if !first.is_empty() && !out.contains(&first) {
+                out.push(first);
+            }
+        }
+    }
+    out
+}
+
+async fn search_best(
+    client: &reqwest::Client,
+    track: &str,
+    artist: &str,
+    duration_secs: Option<u32>,
+) -> Option<Value> {
+    let url = if artist.is_empty() {
+        format!("{BASE}/search?track_name={}", urlencode(track))
+    } else {
+        format!(
+            "{BASE}/search?track_name={}&artist_name={}",
+            urlencode(track),
+            urlencode(artist)
+        )
+    };
+    let v = get(client, &url).await.ok()?;
+    let arr = v.as_array()?;
+    let mut best: Option<&Value> = None;
+    let mut best_score = i64::MIN;
+    for item in arr {
+        if item.get("instrumental").and_then(|x| x.as_bool()).unwrap_or(false) {
+            continue;
+        }
+        // Prefer entries closest to the playing duration; require sync or plain text.
+        let mut score = 0i64;
+        if let (Some(want), Some(have)) = (duration_secs, item.get("duration").and_then(|d| d.as_f64())) {
+            let diff = (have as i64 - want as i64).abs();
+            if diff > 12 {
+                continue;
+            }
+            score -= diff;
+        }
+        if item.get("syncedLyrics").and_then(|x| x.as_str()).map(|s| !s.is_empty()).unwrap_or(false) {
+            score += 1000;
+        }
+        if score > best_score {
+            best_score = score;
+            best = Some(item);
+        }
+    }
+    best.cloned()
 }
 
 fn from_obj(v: &Value) -> Lyrics {
