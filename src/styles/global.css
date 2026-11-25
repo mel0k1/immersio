@@ -20,6 +20,8 @@
   --panel-border: rgba(255, 255, 255, 0.08);
   --panel-blur: none;
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  /* spring approximation of Liner's framer springs (stiffness 260-320, damping 20-22) */
+  --spring: cubic-bezier(0.3, 1.25, 0.4, 1);
 }
 
 /* glass mode (default on) */
@@ -473,15 +475,15 @@ img {
   display: grid;
   grid-template-columns: 34px 1fr auto auto;
   align-items: center;
-  gap: 14px;
-  padding: 7px 12px;
+  gap: 16px;
+  padding: 8px;
   border-radius: 8px;
   cursor: default;
   transition: background 0.15s;
-  min-height: 52px;
+  min-height: 64px;
 }
 .track-row:hover {
-  background: var(--surface);
+  background: var(--surface-2);
 }
 .track-row.playing .tr-title {
   color: var(--accent);
@@ -490,7 +492,7 @@ img {
   color: var(--text-faint);
   font-variant-numeric: tabular-nums;
   text-align: center;
-  font-size: 13px;
+  font-size: 14px;
 }
 .tr-idx .eq {
   color: var(--accent);
@@ -526,8 +528,8 @@ img {
   min-width: 0;
 }
 .tr-thumb {
-  width: 40px;
-  height: 40px;
+  width: 48px;
+  height: 48px;
   border-radius: 8px;
   object-fit: cover;
   background: var(--bg-soft);
@@ -546,12 +548,22 @@ img {
   align-items: center;
   gap: 7px;
 }
+/* library rows follow Liner SongCard: 16px title, 15px artist at 350 */
+.track-row .tr-title {
+  font-weight: 400;
+  font-size: 16px;
+}
 .tr-artist {
   color: var(--text-dim);
   font-size: 13px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+.track-row .tr-artist {
+  font-weight: 350;
+  font-size: 15px;
+  margin-top: 2px;
 }
 .tr-artist span:hover {
   text-decoration: underline;
@@ -561,7 +573,7 @@ img {
 .tr-dur {
   color: var(--text-dim);
   font-variant-numeric: tabular-nums;
-  font-size: 13px;
+  font-size: 14px;
 }
 .tr-acts {
   display: flex;
@@ -859,11 +871,11 @@ img {
   z-index: 45;
   display: flex;
   flex-direction: column;
-  animation: slideIn 0.22s ease;
+  animation: slideIn 0.32s var(--spring);
 }
 @keyframes slideIn {
   from {
-    transform: translateX(30px);
+    transform: translateX(24px);
     opacity: 0;
   }
   to {
@@ -926,6 +938,16 @@ img {
   from {
     opacity: 0;
     transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes popIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.97);
   }
   to {
     opacity: 1;
@@ -1181,7 +1203,7 @@ img {
   max-height: 82vh;
   overflow-y: auto;
   box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6);
-  animation: fadeUp 0.2s var(--ease);
+  animation: popIn 0.28s var(--spring);
 }
 .modal.wide {
   width: min(760px, 94vw);
@@ -1319,7 +1341,17 @@ img {
   padding: 6px;
   min-width: 210px;
   box-shadow: 0 20px 50px rgba(0, 0, 0, 0.55);
-  animation: fadeIn 0.12s ease;
+  animation: menuPop 0.16s var(--spring);
+}
+@keyframes menuPop {
+  from {
+    transform: scale(0.96);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
 }
 .menu-item {
   display: flex;
@@ -1611,6 +1643,7 @@ img {
   .fullscreen,
   .modal,
   .toast,
+  .menu,
   .queue-drawer,
   .modal-back {
     animation-duration: 1ms;
