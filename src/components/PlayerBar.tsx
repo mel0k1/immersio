@@ -1,8 +1,9 @@
-import { Heart, ListMusic, Mic2, Pause, Play, Repeat, Repeat1, Shuffle, SkipBack, SkipForward, Volume1, Volume2, VolumeX } from "lucide-react";
+import { Heart, ListMusic, Mic2, Pause, PictureInPicture2, Play, Repeat, Repeat1, Shuffle, SkipBack, SkipForward, Volume1, Volume2, VolumeX } from "lucide-react";
 import { useLibrary, usePlayer } from "../lib/store";
 import { useT } from "../lib/i18n";
 import { fmtTime } from "../lib/format";
 import { Cover } from "./Cover";
+import { toggleOverlay } from "../lib/overlay";
 import type { CSSProperties } from "react";
 
 function fill(v: number, max: number): CSSProperties {
@@ -86,6 +87,9 @@ export function PlayerBar() {
         </button>
         <button className={`icon-btn${queueOpen ? " active-solid" : ""}`} onClick={() => setQueueOpen(!queueOpen)} title={t("queue")}>
           <ListMusic size={18} />
+        </button>
+        <button className="icon-btn" onClick={() => toggleOverlay()} title={t("overlay")}>
+          <PictureInPicture2 size={18} />
         </button>
         <div className="pb-vol">
           <button className="icon-btn" onClick={toggleMute}>

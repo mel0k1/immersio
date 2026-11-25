@@ -1,6 +1,10 @@
 import { usePlayer, useSettings } from "./store";
 import { api, localAsset, streamUrl } from "./ipc";
 import type { Playable } from "../types";
+import { emit, listen } from "@tauri-apps/api/event";
+import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
+
+const isTauri = "__TAURI_INTERNALS__" in window;
 
 interface YTPlayer {
   playVideo(): void;
@@ -33,6 +37,8 @@ function loadYTApi(cb: () => void) {
   document.head.appendChild(s);
 }
 
+export const EQ_FREQS = [60, 230, 910, 3600, 14000];
+
 class Engine {
   el: HTMLAudioElement | null = null;
   mode: "none" | "audio" | "iframe" = "none";
@@ -42,12 +48,31 @@ class Engine {
   gen = 0;
   pendingSeek: number | null = null;
   shouldPlay = false;
-  pendingVolume = -1;
+  elEq: boolean = false;
+  eqCtx: AudioContext | null = null;
+  eqFilters: BiquadFilterNode[] | null = null;
 
-  private audio(): HTMLAudioElement {
+  private teardownAudio() {
+    if (this.el) {
+      this.el.pause();
+      this.el.removeAttribute("src");
+      this.el.load();
+      this.el = null;
+    }
+    if (this.eqCtx) {
+      this.eqCtx.close().catch(() => undefined);
+      this.eqCtx = null;
+      this.eqFilters = null;
+    }
+    this.elEq = false;
+  }
+
+  private ensureAudio(needEq: boolean): HTMLAudioElement {
+    if (this.el && this.elEq !== needEq) this.teardownAudio();
     if (!this.el) {
       this.el = new Audio();
       this.el.preload = "auto";
+      this.elEq = needEq;
       this.el.addEventListener("timeupdate", () => {
         if (this.mode === "audio") emitTime(this.el!.currentTime, this.el!.duration || 0);
       });
@@ -63,8 +88,45 @@ class Engine {
         if (this.mode === "audio" && this.current?.videoId) this.fallbackIframe(this.current);
         else if (this.mode === "audio") usePlayer.getState().setError("streamError");
       });
+      if (needEq) this.buildEqGraph(this.el);
     }
     return this.el;
+  }
+
+  private buildEqGraph(el: HTMLAudioElement) {
+    try {
+      const ctx = new AudioContext();
+      const src = ctx.createMediaElementSource(el);
+      const filters = EQ_FREQS.map((f, i) => {
+        const b = ctx.createBiquadFilter();
+        b.type = i === 0 ? "lowshelf" : i === EQ_FREQS.length - 1 ? "highshelf" : "peaking";
+        b.frequency.value = f;
+        b.Q.value = 0.9;
+        b.gain.value = 0;
+        return b;
+      });
+      let node: AudioNode = src;
+      for (const f of filters) {
+        node.connect(f);
+        node = f;
+      }
+      node.connect(ctx.destination);
+      this.eqCtx = ctx;
+      this.eqFilters = filters;
+      ctx.resume().catch(() => undefined);
+    } catch {
+      this.eqCtx = null;
+      this.eqFilters = null;
+    }
+  }
+
+  applyEqGains() {
+    if (!this.eqFilters) return;
+    const s = useSettings.getState();
+    const gains = s.eqEnabled ? s.eqGains : [0, 0, 0, 0, 0];
+    this.eqFilters.forEach((f, i) => {
+      f.gain.value = gains[i] ?? 0;
+    });
   }
 
   position(): number {
@@ -83,13 +145,14 @@ class Engine {
     const gen = ++this.gen;
     this.destroyIframe();
     const st = usePlayer.getState();
+    const settings = useSettings.getState();
     this.shouldPlay = st.playing;
     st.setLoading(true);
     st.setError(null, false);
     st.setPosition(0, track.durationSecs ?? 0);
     if (track.localPath) {
       this.mode = "audio";
-      const el = this.audio();
+      const el = this.ensureAudio(false);
       el.src = localAsset(track.localPath);
       el.load();
       this.applyVolume();
@@ -101,15 +164,17 @@ class Engine {
     }
     if (!track.videoId) return;
     try {
-      const q = useSettings.getState().streamQuality;
-      const info = await api.stream(track.videoId, "ru", q);
+      const info = await api.stream(track.videoId, "ru", settings.streamQuality);
       if (gen !== this.gen) return;
       this.mode = "audio";
-      const el = this.audio();
-      el.src = streamUrl(info);
+      const el = this.ensureAudio(settings.eqEnabled);
+      el.removeAttribute("crossorigin");
+      el.crossOrigin = "anonymous";
+      el.src = streamUrl(info, track.videoId, settings.offlineCache);
       el.load();
       this.applyVolume();
       this.applyRate();
+      this.applyEqGains();
       if (info.durationMs) st.setPosition(0, info.durationMs / 1000);
       if (this.shouldPlay) el.play().catch(() => undefined);
       updateMediaSession(track);
@@ -121,6 +186,15 @@ class Engine {
       }
       this.fallbackIframe(track);
     }
+  }
+
+  reloadCurrent() {
+    const t = this.current;
+    if (!t) return;
+    const pos = this.position();
+    this.current = null;
+    if (this.pendingSeek == null) this.pendingSeek = pos;
+    this.load(t);
   }
 
   private fallbackIframe(track: Playable) {
@@ -270,6 +344,23 @@ function updateMediaSession(t: Playable) {
 
 export const engine = new Engine();
 
+export function emitOverlayState() {
+  if (!isTauri) return;
+  const s = usePlayer.getState();
+  const t = s.queue[s.index];
+  emit("imm-state", {
+    hasTrack: !!t,
+    title: t?.title ?? "",
+    artist: t?.artists.join(", ") ?? "",
+    thumb: t?.thumb ?? t?.coverPath ?? null,
+    playing: s.playing,
+    loading: s.loading,
+    position: s.position,
+    duration: s.duration || t?.durationSecs || 0,
+    videoId: t?.videoId ?? null,
+  }).catch(() => undefined);
+}
+
 let discordKey = "";
 
 function syncDiscord(s: ReturnType<typeof usePlayer.getState>, force = false) {
@@ -305,25 +396,47 @@ export function bindEngine() {
     if ((t?.key ?? null) !== (tp?.key ?? null)) {
       engine.load(t);
       syncDiscord(s);
+      emitOverlayState();
       return;
     }
     if (s.playing !== prev.playing) {
       engine.setPlaying(s.playing);
       syncDiscord(s);
+      emitOverlayState();
     }
     if (s.volume !== prev.volume || s.muted !== prev.muted) engine.applyVolume();
     if (Math.abs(s.position - prev.position) > 1.1 && Math.abs(s.position - engine.position()) > 1.1) {
       engine.seek(s.position);
     }
+    if (Math.abs(s.position - prev.position) > 0.25) emitOverlayState();
   });
   useSettings.subscribe((s, prev) => {
     if (s.rate !== prev.rate) engine.applyRate();
     if (s.discordId !== prev.discordId) syncDiscord(usePlayer.getState(), true);
+    if (s.eqEnabled !== prev.eqEnabled) engine.reloadCurrent();
+    if (s.eqEnabled && s.eqGains !== prev.eqGains) engine.applyEqGains();
+    if (s.offlineCache !== prev.offlineCache) {
+      // cache flag is applied on next track load
+    }
   });
   window.setInterval(() => {
     const st = usePlayer.getState();
     if (st.playing) syncDiscord(st, true);
   }, 15000);
+  if (isTauri) {
+    listen("imm-request", () => emitOverlayState()).catch(() => undefined);
+    listen<{ cmd: string; value?: number }>("imm-cmd", (e) => {
+      const p = usePlayer.getState();
+      const { cmd, value } = e.payload;
+      if (cmd === "toggle") p.toggle();
+      else if (cmd === "next") p.next();
+      else if (cmd === "prev") p.prev();
+      else if (cmd === "seek" && typeof value === "number") p.seek(value);
+      else if (cmd === "close") {
+        WebviewWindow.getByLabel("overlay").then((w) => w?.close()).catch(() => undefined);
+      }
+    }).catch(() => undefined);
+  }
   if ("mediaSession" in navigator) {
     navigator.mediaSession.setActionHandler("play", () => usePlayer.getState().setPlaying(true));
     navigator.mediaSession.setActionHandler("pause", () => usePlayer.getState().setPlaying(false));

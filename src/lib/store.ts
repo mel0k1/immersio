@@ -13,6 +13,9 @@ interface SettingsState {
   lyricsOffsetMs: number;
   radioAuto: boolean;
   discordId: string;
+  offlineCache: boolean;
+  eqEnabled: boolean;
+  eqGains: number[];
   setLang: (l: "ru" | "en") => void;
   setAccent: (a: string) => void;
   setStreamQuality: (q: "high" | "low") => void;
@@ -20,6 +23,9 @@ interface SettingsState {
   setLyricsOffset: (ms: number) => void;
   setRadioAuto: (v: boolean) => void;
   setDiscordId: (v: string) => void;
+  setOfflineCache: (v: boolean) => void;
+  setEqEnabled: (v: boolean) => void;
+  setEqGains: (g: number[]) => void;
 }
 
 export const useSettings = create<SettingsState>()(
@@ -32,6 +38,9 @@ export const useSettings = create<SettingsState>()(
       lyricsOffsetMs: 0,
       radioAuto: true,
       discordId: "",
+      offlineCache: true,
+      eqEnabled: false,
+      eqGains: [0, 0, 0, 0, 0],
       setLang: (lang) => set({ lang }),
       setAccent: (accent) => set({ accent }),
       setStreamQuality: (streamQuality) => set({ streamQuality }),
@@ -39,6 +48,9 @@ export const useSettings = create<SettingsState>()(
       setLyricsOffset: (lyricsOffsetMs) => set({ lyricsOffsetMs }),
       setRadioAuto: (radioAuto) => set({ radioAuto }),
       setDiscordId: (discordId) => set({ discordId }),
+      setOfflineCache: (offlineCache) => set({ offlineCache }),
+      setEqEnabled: (eqEnabled) => set({ eqEnabled }),
+      setEqGains: (eqGains) => set({ eqGains }),
     }),
     { name: "imm-settings" },
   ),
@@ -123,18 +135,22 @@ export const useLibrary = create<LibraryState>()(
 interface UiState {
   addToPlaylist: TrackItem[] | null;
   createOpen: boolean;
+  importOpen: boolean;
   toast: string | null;
   openAddToPlaylist: (t: TrackItem[] | null) => void;
   setCreateOpen: (v: boolean) => void;
+  setImportOpen: (v: boolean) => void;
   showToast: (msg: string) => void;
 }
 
 export const useUi = create<UiState>()((set) => ({
   addToPlaylist: null,
   createOpen: false,
+  importOpen: false,
   toast: null,
   openAddToPlaylist: (t) => set({ addToPlaylist: t }),
   setCreateOpen: (createOpen) => set({ createOpen }),
+  setImportOpen: (importOpen) => set({ importOpen }),
   showToast: (msg) => {
     set({ toast: msg });
     window.setTimeout(() => set({ toast: null }), 2600);

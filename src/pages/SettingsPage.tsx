@@ -3,22 +3,36 @@ import { Palette, SlidersHorizontal, Info } from "lucide-react";
 import { useSettings, useLibrary, useUi } from "../lib/store";
 import { useT } from "../lib/i18n";
 import { api } from "../lib/ipc";
+import { EQ_FREQS } from "../lib/audio";
 
 const ACCENTS = ["#7c5cff", "#ff5c7c", "#3ecf8e", "#4d71ff", "#ffb020", "#e8e8ee"];
 
 const TABS = ["appearance", "playback", "about"] as const;
 type Tab = (typeof TABS)[number];
 
+function fmtSize(bytes: number): string {
+  if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+}
+
 export function SettingsPage() {
   const t = useT();
-  const { lang, accent, setLang, setAccent, streamQuality, rate, radioAuto, discordId, setStreamQuality, setRate, setRadioAuto, setDiscordId } = useSettings();
+  const {
+    lang, accent, setLang, setAccent, streamQuality, rate, radioAuto, discordId,
+    offlineCache, eqEnabled, eqGains,
+    setStreamQuality, setRate, setRadioAuto, setDiscordId, setOfflineCache, setEqEnabled, setEqGains,
+  } = useSettings();
   const showToast = useUi((s) => s.showToast);
   const clearAll = useLibrary((s) => s.clearAll);
   const [version, setVersion] = useState("");
   const [discordInput, setDiscordInput] = useState(discordId);
+  const [cookieInput, setCookieInput] = useState("");
+  const [cacheInfo, setCacheInfo] = useState<[number, number] | null>(null);
   const [tab, setTab] = useState<Tab>("appearance");
   useEffect(() => {
     api.version().then(setVersion).catch(() => setVersion(""));
+    api.cacheStats().then(setCacheInfo).catch(() => undefined);
   }, []);
 
   return (
@@ -90,6 +104,95 @@ export function SettingsPage() {
               </div>
               <div className="settings-row">
                 <div>
+                  <div className="settings-label">{t("offlineCache")}</div>
+                  <div className="settings-desc">{t("offlineCacheDesc")}{cacheInfo ? ` — ${fmtSize(cacheInfo[0])}, ${cacheInfo[1]}` : ""}</div>
+                </div>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button
+                    className="btn"
+                    onClick={() =>
+                      api
+                        .cacheClear()
+                        .then(() => {
+                          setCacheInfo([0, 0]);
+                          showToast(t("cacheCleared"));
+                        })
+                        .catch((e) => showToast(String(e)))
+                    }
+                  >
+                    {t("cacheClear")}
+                  </button>
+                  <button className={`btn${offlineCache ? " accent" : ""}`} onClick={() => setOfflineCache(!offlineCache)}>
+                    {offlineCache ? "ON" : "OFF"}
+                  </button>
+                </div>
+              </div>
+              <div className="settings-row">
+                <div>
+                  <div className="settings-label">{t("equalizer")}</div>
+                  <div className="settings-desc">{t("eqDesc")}</div>
+                </div>
+                <button className={`btn${eqEnabled ? " accent" : ""}`} onClick={() => setEqEnabled(!eqEnabled)}>
+                  {eqEnabled ? "ON" : "OFF"}
+                </button>
+              </div>
+              {eqEnabled && (
+                <div className="settings-row">
+                  <div style={{ flex: 1 }}>
+                    <div style={{ display: "flex", gap: 14 }}>
+                      {EQ_FREQS.map((f, i) => (
+                        <div key={f} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
+                          <span style={{ fontSize: 11, color: "var(--text-dim)" }}>{eqGains[i]} dB</span>
+                          <input
+                            className="slider"
+                            type="range"
+                            min={-12}
+                            max={12}
+                            step={1}
+                            value={eqGains[i] ?? 0}
+                            style={{ width: 110, "--fill": `${(((eqGains[i] ?? 0) + 12) / 24) * 100}%` } as React.CSSProperties}
+                            onChange={(e) => {
+                              const g = [...eqGains];
+                              g[i] = Number(e.target.value);
+                              setEqGains(g);
+                            }}
+                          />
+                          <span style={{ fontSize: 11, color: "var(--text-dim)" }}>{f >= 1000 ? `${f / 1000}k` : f}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+              <div className="settings-row">
+                <div>
+                  <div className="settings-label">{t("ytCookies")}</div>
+                  <div className="settings-desc">{t("ytCookiesDesc")}</div>
+                </div>
+                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                  <input
+                    className="field"
+                    style={{ width: 260, marginBottom: 0 }}
+                    type="password"
+                    placeholder={t("ytCookies")}
+                    value={cookieInput}
+                    onChange={(e) => setCookieInput(e.target.value)}
+                  />
+                  <button
+                    className="btn"
+                    onClick={() =>
+                      api
+                        .setYtCookies(cookieInput.trim() ? cookieInput.trim() : null)
+                        .then(() => showToast(t("cookiesSaved")))
+                        .catch((e) => showToast(String(e)))
+                    }
+                  >
+                    {t("save")}
+                  </button>
+                </div>
+              </div>
+              <div className="settings-row">
+                <div>
                   <div className="settings-label">{t("radioAuto")}</div>
                   <div className="settings-desc">{t("radioAutoDesc")}</div>
                 </div>
@@ -141,7 +244,7 @@ export function SettingsPage() {
                 <div>
                   <div style={{ fontSize: 17, fontWeight: 750 }}>Immersio</div>
                   <div style={{ color: "var(--text-dim)", fontSize: 13 }}>
-                    {t("version")} {version || "0.2.0"}
+                    {t("version")} {version || "0.3.0"}
                   </div>
                 </div>
               </div>

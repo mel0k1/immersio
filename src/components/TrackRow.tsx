@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { Heart, Link2, ListPlus, ListStart, MoreVertical, Play, Radio, Trash2, User, Disc3, Pause } from "lucide-react";
+import { Download, Heart, Link2, ListPlus, ListStart, MoreVertical, Play, Radio, Trash2, User, Disc3, Pause } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { save } from "@tauri-apps/plugin-dialog";
 import type { Playable, TrackItem } from "../types";
 import { playableOf } from "../types";
 import { useLibrary, usePlayer, useUi } from "../lib/store";
@@ -68,6 +69,24 @@ export function TrackRow({ raw, track, index, queue, onRemove, showAlbumLink = t
       label: t("copyLink"),
       onClick: () => {
         navigator.clipboard.writeText(`https://music.youtube.com/watch?v=${raw.videoId}`).then(() => showToast(t("linkCopied")));
+      },
+    });
+    items.push({
+      icon: Download,
+      label: t("download"),
+      onClick: async () => {
+        try {
+          const path = await save({
+            defaultPath: `${raw.artists[0] ?? ""} - ${raw.title}.m4a`.replace(/[\\/:*?"<>|]/g, "_"),
+            filters: [{ name: "Audio", extensions: ["m4a", "webm"] }],
+          });
+          if (!path) return;
+          showToast(t("downloading"));
+          await api.downloadTrack(raw.videoId, "ru", path);
+          showToast(t("downloadOk"));
+        } catch (e) {
+          showToast(String(e));
+        }
       },
     });
     items.push({ label: "-" });

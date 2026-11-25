@@ -1326,3 +1326,86 @@ img {
     transform: none;
   }
 }
+
+/* Overlay mini player window */
+.overlay-page {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+}
+.overlay-card {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  width: 100%;
+  height: 100%;
+  padding: 10px 12px;
+  box-sizing: border-box;
+  background: rgba(18, 18, 22, 0.94);
+  backdrop-filter: blur(24px);
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  user-select: none;
+}
+.overlay-cover {
+  width: 62px;
+  height: 62px;
+  border-radius: 10px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.overlay-cover > * {
+  width: 100%;
+  height: 100%;
+}
+.overlay-mid {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.overlay-title {
+  font-size: 13px;
+  font-weight: 650;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.overlay-artist {
+  font-size: 11.5px;
+  color: var(--text-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.overlay-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.overlay-times {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+  color: var(--text-faint);
+}
+.overlay-controls {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+/* Offline banner */
+.offline-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 18px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #ffb020;
+  background: rgba(255, 176, 32, 0.12);
+  border-bottom: 1px solid rgba(255, 176, 32, 0.25);
+}

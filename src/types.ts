@@ -118,6 +118,13 @@ export interface UserPlaylist {
   tracks: TrackItem[];
 }
 
+export interface ImportResult {
+  kind: string;
+  name: string;
+  tracks: TrackItem[];
+  failed: number;
+}
+
 export const playableOf = (t: TrackItem): Playable => ({
   key: t.videoId,
   videoId: t.videoId,

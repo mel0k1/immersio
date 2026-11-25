@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { HashRouter, Route, Routes, useNavigate } from "react-router-dom";
-import { AlertTriangle, X } from "lucide-react";
+import { AlertTriangle, WifiOff, X } from "lucide-react";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import "@fontsource-variable/inter";
 import "./styles/global.css";
@@ -10,6 +10,8 @@ import { PlayerBar } from "./components/PlayerBar";
 import { QueueDrawer } from "./components/QueueDrawer";
 import { Fullscreen } from "./components/Fullscreen";
 import { PlaylistModals, Toast } from "./components/PlaylistModals";
+import { ImportModal } from "./components/ImportModal";
+import { OverlayPage } from "./components/OverlayPage";
 import { HomePage } from "./pages/HomePage";
 import { SearchPage } from "./pages/SearchPage";
 import { LibraryPage } from "./pages/LibraryPage";
@@ -21,8 +23,7 @@ import { useLibrary, usePlayer, useSettings, useUi } from "./lib/store";
 import { bindEngine } from "./lib/audio";
 import { api } from "./lib/ipc";
 import { useT } from "./lib/i18n";
-
-const isTauri = "__TAURI_INTERNALS__" in window;
+import { isOverlayWindow, isTauri } from "./lib/env";
 
 function ErrorToast() {
   const error = usePlayer((s) => s.error);
@@ -36,6 +37,28 @@ function ErrorToast() {
       <button className="icon-btn" style={{ width: 26, height: 26 }} onClick={dismiss}>
         <X size={14} />
       </button>
+    </div>
+  );
+}
+
+function OfflineBanner() {
+  const t = useT();
+  const [online, setOnline] = useState(navigator.onLine);
+  useEffect(() => {
+    const up = () => setOnline(true);
+    const down = () => setOnline(false);
+    window.addEventListener("online", up);
+    window.addEventListener("offline", down);
+    return () => {
+      window.removeEventListener("online", up);
+      window.removeEventListener("offline", down);
+    };
+  }, []);
+  if (online) return null;
+  return (
+    <div className="offline-banner">
+      <WifiOff size={15} />
+      {t("offline")}
     </div>
   );
 }
@@ -174,6 +197,7 @@ function Shell() {
       <WindowControls />
       <Sidebar />
       <div className="main">
+        <OfflineBanner />
         <div className="content">
           <Routes>
             <Route path="/" element={<HomePage />} />
@@ -193,6 +217,7 @@ function Shell() {
       </div>
       <Fullscreen />
       <PlaylistModals />
+      <ImportModal />
       <Toast />
       <ErrorToast />
       <DropOverlay />
@@ -203,6 +228,7 @@ function Shell() {
 }
 
 export default function App() {
+  if (isOverlayWindow) return <OverlayPage />;
   return (
     <HashRouter>
       <Shell />

@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Plus, Search } from "lucide-react";
+import { Download, Plus, Search } from "lucide-react";
 import { bestThumb } from "../types";
 import { useLibrary, useUi } from "../lib/store";
 import { useT } from "../lib/i18n";
@@ -18,6 +18,7 @@ export function LibraryPage() {
   const saved = useLibrary((s) => s.saved);
   const localCount = useLibrary((s) => s.localTracks.length);
   const setCreateOpen = useUi((s) => s.setCreateOpen);
+  const setImportOpen = useUi((s) => s.setImportOpen);
   const [tab, setTab] = useState<Tab>("all");
   const [filter, setFilter] = useState("");
 
@@ -65,6 +66,10 @@ export function LibraryPage() {
           <Search size={16} />
           <input placeholder={t("searchLibrary")} value={filter} onChange={(e) => setFilter(e.target.value)} />
         </div>
+        <button className="btn" onClick={() => setImportOpen(true)}>
+          <Download size={16} />
+          {t("importPlaylist")}
+        </button>
         <button className="btn" onClick={() => setCreateOpen(true)}>
           <Plus size={16} />
           {t("createPlaylist")}

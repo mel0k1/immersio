@@ -1,5 +1,5 @@
 import { invoke, convertFileSrc } from "@tauri-apps/api/core";
-import type { Browse, Lyrics, LocalTrack, SearchResults, StreamInfo, TrackItem } from "../types";
+import type { Browse, ImportResult, Lyrics, LocalTrack, SearchResults, StreamInfo, TrackItem } from "../types";
 
 export const api = {
   search: (query: string, hl: string) =>
@@ -10,12 +10,19 @@ export const api = {
     invoke<StreamInfo>("yt_stream", { videoId, hl, quality }),
   radio: (videoId: string, hl: string) =>
     invoke<TrackItem[]>("yt_radio", { videoId, hl }),
+  importPlaylist: (url: string, hl: string) =>
+    invoke<ImportResult>("import_playlist", { url, hl }),
   lyrics: (track: string, artist: string, album: string | null, duration: number | null) =>
     invoke<Lyrics>("lyrics_fetch", { track, artist, album, duration }),
   fetchImage: (url: string) => invoke<number[]>("fetch_image", { url }),
   importLocal: (paths: string[]) => invoke<LocalTrack[]>("import_local", { paths }),
   scanLocalDir: (dir: string) => invoke<string[]>("scan_local_dir", { dir }),
   removeLocal: (tracks: LocalTrack[]) => invoke<void>("remove_local", { tracks }),
+  setYtCookies: (cookies: string | null) => invoke<void>("yt_set_cookies", { cookies }),
+  cacheStats: () => invoke<[number, number]>("cache_stats"),
+  cacheClear: () => invoke<void>("cache_clear"),
+  downloadTrack: (videoId: string, hl: string, path: string) =>
+    invoke<void>("download_track", { videoId, hl, path }),
   version: () => invoke<string>("app_version"),
   discordUpdate: (p: { clientId: string; title: string; artist: string; cover: string | null; elapsed: number; remaining: number }) =>
     invoke<void>("discord_update", p),
@@ -28,8 +35,8 @@ export function localAsset(path: string): string {
   return convertFileSrc(path);
 }
 
-export function streamUrl(info: StreamInfo): string {
-  const payload = JSON.stringify({ url: info.url, mime: info.mime });
+export function streamUrl(info: StreamInfo, videoId: string, cache: boolean): string {
+  const payload = JSON.stringify({ url: info.url, mime: info.mime, videoId, cache });
   const bytes = new TextEncoder().encode(payload);
   let bin = "";
   bytes.forEach((b) => (bin += String.fromCharCode(b)));
