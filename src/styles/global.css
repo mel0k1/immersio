@@ -679,7 +679,7 @@ img {
   backdrop-filter: blur(10px);
 }
 .hero-actions .btn:hover {
-  background: var(--surface-3);
+  background: rgba(255, 255, 255, 0.22);
 }
 .hero-actions .btn.primary {
   background: var(--text);
@@ -983,8 +983,10 @@ img {
 .fs-veil {
   position: absolute;
   inset: 0;
-  background: rgba(13, 13, 16, 0.45);
   z-index: 1;
+  background:
+    linear-gradient(90deg, rgba(13, 13, 16, 0.25) 0%, rgba(13, 13, 16, 0.5) 55%, rgba(13, 13, 16, 0.75) 100%),
+    rgba(13, 13, 16, 0.35);
 }
 .fs-left {
   position: relative;
@@ -1015,14 +1017,14 @@ img {
   max-width: 46vh;
 }
 .fs-title {
-  font-size: 22px;
+  font-size: 26px;
   font-weight: 800;
   letter-spacing: -0.01em;
 }
 .fs-artist {
   color: rgba(255, 255, 255, 0.65);
-  font-size: 13px;
-  margin-top: 3px;
+  font-size: 14.5px;
+  margin-top: 4px;
 }
 .fs-controls {
   display: flex;
@@ -1074,12 +1076,6 @@ img {
   gap: 8px;
   width: 180px;
   margin-top: 6px;
-}
-.fs-like {
-  position: absolute;
-  right: max(24px, calc(28% - 60px));
-  top: 50%;
-  transform: translateY(-160%);
 }
 
 .lyrics-pane {
@@ -1140,6 +1136,23 @@ img {
   align-items: center;
   justify-content: space-between;
   padding: 14px 18px;
+}
+.fs-chip {
+  background: rgba(18, 18, 24, 0.5);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+}
+.fs-chip button {
+  color: rgba(255, 255, 255, 0.75);
+}
+.fs-chip button:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.08);
+}
+.fs-chip button.active {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.12);
 }
 
 .modal-back {
@@ -1424,12 +1437,6 @@ img {
   }
   .lyrics-pane {
     display: none;
-  }
-  .fs-like {
-    right: 24px;
-    top: auto;
-    bottom: 20px;
-    transform: none;
   }
 }
 

@@ -2,12 +2,14 @@ import { useEffect, useRef } from "react";
 
 const VERT = "attribute vec2 p;void main(){gl_Position=vec4(p,0.,1.);}";
 
+// slow drifting color wash built from 3 palette colors — never shows the artwork itself
 const FRAG = `
 precision mediump float;
-uniform sampler2D u_tex;
+uniform vec3 u_c0;
+uniform vec3 u_c1;
+uniform vec3 u_c2;
 uniform vec2 u_res;
 uniform float u_time;
-uniform float u_intensity;
 vec3 mod289(vec3 x){return x-floor(x*(1./289.))*289.;}
 vec2 mod289(vec2 x){return x-floor(x*(1./289.))*289.;}
 vec3 permute(vec3 x){return mod289((x*34.+1.)*x);}
@@ -33,30 +35,103 @@ float snoise(vec2 v){
   return 130.*dot(m,g);
 }
 void main(){
-  float t=u_time*0.08;
   vec2 uv=gl_FragCoord.xy/u_res;
-  uv=(uv-0.5)/1.18+0.5;
-  vec2 q=vec2(snoise(uv*0.5+vec2(t*0.6,t*0.4)),snoise(uv*0.5+vec2(-t*0.5,t*0.7)+vec2(43.12,17.89)));
-  vec2 r=vec2(snoise(uv*1.1+q*0.7+vec2(1.7,9.2)),snoise(uv*1.1+q*0.7+vec2(8.3,2.8)));
-  vec2 w=uv+(q*0.6+r*0.4)*u_intensity*0.28;
-  vec3 col=vec3(0.);
-  float total=0.;
-  for(int i=0;i<9;i++){
-    float fi=float(i);
-    vec2 off=vec2(snoise(w*3.+fi*7.31),snoise(w*3.-fi*4.17))*0.012;
-    vec2 suv=clamp(w+off,0.001,0.999);
-    col+=texture2D(u_tex,suv).rgb;
-    total+=1.;
-  }
-  col/=total;
-  float sat=1.3;
-  float l=dot(col,vec3(0.299,0.587,0.114));
-  col=mix(vec3(l),col,sat);
+  float t=u_time*0.05;
+  vec2 q=vec2(snoise(uv*0.9+vec2(t*0.7,t*0.3)),snoise(uv*0.9+vec2(-t*0.4,t*0.6)));
+  float m1=smoothstep(-0.7,0.7,snoise(uv*0.55+q*0.35+vec2(t*0.5,0.)));
+  float m2=smoothstep(-0.7,0.7,snoise(uv*0.62+q*0.3+vec2(0.,t*0.42)+vec2(31.7,7.3)));
+  vec3 col=mix(u_c0,u_c1,m1);
+  col=mix(col,u_c2,m2*0.7);
   vec2 d=uv-0.5;
-  col*=1.0-dot(d,d)*0.9;
+  col*=mix(0.5,1.0,clamp(1.0-dot(d,d)*1.7,0.0,1.0));
+  col*=0.8;
   gl_FragColor=vec4(col,1.);
 }
 `;
+
+const FALLBACK: [number, number, number][] = [
+  [42, 38, 66],
+  [58, 44, 84],
+  [30, 42, 62],
+];
+
+function dist2(a: [number, number, number], b: [number, number, number]) {
+  const dr = a[0] - b[0];
+  const dg = a[1] - b[1];
+  const db = a[2] - b[2];
+  return dr * dr + dg * dg + db * db;
+}
+
+// keep colors dark and muted so the wash never turns garish
+function clampDark(c: [number, number, number]): [number, number, number] {
+  const [r, g, b] = c;
+  const l = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  const mx = Math.max(r, g, b);
+  const mn = Math.min(r, g, b);
+  const sat = mx > 0 ? (mx - mn) / mx : 0;
+  const target = 0.22 + Math.min(0.16, l * 0.3); // pull lightness into a narrow dark band
+  const k = target / Math.max(0.05, l);
+  const boost = 0.75 + sat * 0.5;
+  const mid = (r + g + b) / 3;
+  const f = (v: number) => Math.round(Math.max(0, Math.min(255, mid + (v - mid) * boost * k)));
+  return [f(r), f(g), f(b)];
+}
+
+function extractColors(src: string): Promise<[number, number, number][]> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      try {
+        const n = 32;
+        const c = document.createElement("canvas");
+        c.width = n;
+        c.height = n;
+        const ctx = c.getContext("2d", { willReadFrequently: true });
+        if (!ctx) throw new Error("no ctx");
+        ctx.drawImage(img, 0, 0, n, n);
+        const d = ctx.getImageData(0, 0, n, n).data;
+        const buckets = new Map<string, { r: number; g: number; b: number; cnt: number }>();
+        for (let i = 0; i < d.length; i += 4) {
+          const key = `${d[i] >> 5}_${d[i + 1] >> 5}_${d[i + 2] >> 5}`;
+          const e = buckets.get(key) ?? { r: 0, g: 0, b: 0, cnt: 0 };
+          e.r += d[i];
+          e.g += d[i + 1];
+          e.b += d[i + 2];
+          e.cnt++;
+          buckets.set(key, e);
+        }
+        const tops = [...buckets.values()]
+          .sort((a, b) => b.cnt - a.cnt)
+          .slice(0, 10)
+          .map((e) => [e.r / e.cnt, e.g / e.cnt, e.b / e.cnt] as [number, number, number]);
+        const picked: [number, number, number][] = [];
+        if (tops.length) picked.push(tops[0]);
+        while (picked.length < 3 && tops.length) {
+          let best: [number, number, number] | null = null;
+          let bestD = -1;
+          for (const t of tops) {
+            const dmin = Math.min(...picked.map((p) => dist2(p, t)));
+            if (dmin > bestD) {
+              bestD = dmin;
+              best = t;
+            }
+          }
+          if (!best || bestD < 900) break; // remaining colors are too similar
+          picked.push(best);
+        }
+        while (picked.length < 3) {
+          const p = picked[picked.length - 1] ?? [40, 40, 48];
+          picked.push([p[2] * 0.6 + 14, p[0] * 0.5 + 10, p[1] * 0.6 + 22]);
+        }
+        resolve(picked.map(clampDark));
+      } catch {
+        resolve(FALLBACK);
+      }
+    };
+    img.onerror = () => resolve(FALLBACK);
+    img.src = src;
+  });
+}
 
 function compile(gl: WebGLRenderingContext, type: number, src: string): WebGLShader | null {
   const s = gl.createShader(type);
@@ -69,7 +144,12 @@ function compile(gl: WebGLRenderingContext, type: number, src: string): WebGLSha
 
 export function Ambient({ src, enabled, playing }: { src: string | null; enabled: boolean; playing: boolean }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const stateRef = useRef<{ gl: WebGLRenderingContext | null; tex: WebGLTexture | null; uni: Record<string, WebGLUniformLocation | null> }>({ gl: null, tex: null, uni: {} });
+  const stateRef = useRef<{
+    gl: WebGLRenderingContext | null;
+    uni: Record<string, WebGLUniformLocation | null>;
+    colors: [number, number, number][];
+    dirty: boolean;
+  }>({ gl: null, uni: {}, colors: FALLBACK, dirty: true });
   const playingRef = useRef(playing);
   playingRef.current = playing;
 
@@ -93,42 +173,31 @@ export function Ambient({ src, enabled, playing }: { src: string | null; enabled
     const loc = gl.getAttribLocation(prog, "p");
     gl.enableVertexAttribArray(loc);
     gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
-    const tex = gl.createTexture();
-    gl.bindTexture(gl.TEXTURE_2D, tex);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    extractColors(src).then((colors) => {
+      stateRef.current.colors = colors;
+      stateRef.current.dirty = true;
+    });
     const st = stateRef.current;
     st.gl = gl;
-    st.tex = tex;
     st.uni = {
-      u_tex: gl.getUniformLocation(prog, "u_tex"),
+      u_c0: gl.getUniformLocation(prog, "u_c0"),
+      u_c1: gl.getUniformLocation(prog, "u_c1"),
+      u_c2: gl.getUniformLocation(prog, "u_c2"),
       u_res: gl.getUniformLocation(prog, "u_res"),
       u_time: gl.getUniformLocation(prog, "u_time"),
-      u_intensity: gl.getUniformLocation(prog, "u_intensity"),
     };
-    const img = new Image();
-    img.onload = () => {
-      if (stateRef.current.tex !== tex) return;
-      gl.bindTexture(gl.TEXTURE_2D, tex);
-      gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, 1);
-      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, img);
-      canvas.style.opacity = "1";
-    };
-    img.src = src;
     const resize = () => {
       const w = Math.max(1, Math.floor(canvas.clientWidth / 2));
       const h = Math.max(1, Math.floor(canvas.clientHeight / 2));
       if (canvas.width !== w || canvas.height !== h) {
         canvas.width = w;
         canvas.height = h;
+        st.dirty = true;
       }
     };
     resize();
     let raf = 0;
     let last = 0;
-    let acc = 0;
     const t0 = performance.now();
     const loop = (now: number) => {
       raf = requestAnimationFrame(loop);
@@ -136,28 +205,25 @@ export function Ambient({ src, enabled, playing }: { src: string | null; enabled
       last = now;
       if (document.hidden) return;
       if (dt < 31) return;
-      if (!playingRef.current) {
-        acc = 0;
-        return;
-      }
-      acc += dt;
       resize();
-      const g = stateRef.current.gl;
-      if (!g || !stateRef.current.tex) return;
+      const g = st.gl;
+      if (!g) return;
+      if (!playingRef.current && !st.dirty) return;
+      st.dirty = false;
       g.viewport(0, 0, canvas.width, canvas.height);
-      g.uniform2f(stateRef.current.uni.u_res!, canvas.width, canvas.height);
-      g.uniform1f(stateRef.current.uni.u_time!, (now - t0 + acc) / 1000);
-      g.uniform1f(stateRef.current.uni.u_intensity!, 1);
-      g.activeTexture(gl.TEXTURE0);
-      g.bindTexture(g.TEXTURE_2D, stateRef.current.tex);
-      g.uniform1i(stateRef.current.uni.u_tex!, 0);
+      const [c0, c1, c2] = st.colors;
+      g.uniform3f(st.uni.u_c0!, c0[0] / 255, c0[1] / 255, c0[2] / 255);
+      g.uniform3f(st.uni.u_c1!, c1[0] / 255, c1[1] / 255, c1[2] / 255);
+      g.uniform3f(st.uni.u_c2!, c2[0] / 255, c2[1] / 255, c2[2] / 255);
+      g.uniform2f(st.uni.u_res!, canvas.width, canvas.height);
+      g.uniform1f(st.uni.u_time!, (now - t0) / 1000);
       g.drawArrays(g.TRIANGLES, 0, 3);
     };
     raf = requestAnimationFrame(loop);
+    canvas.style.opacity = "1";
     return () => {
       cancelAnimationFrame(raf);
       stateRef.current.gl = null;
-      stateRef.current.tex = null;
       canvas.style.opacity = "0";
       gl.getExtension("WEBGL_lose_context")?.loseContext();
     };

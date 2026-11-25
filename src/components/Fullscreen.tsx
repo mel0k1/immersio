@@ -161,7 +161,7 @@ export function Fullscreen() {
         </button>
         <div style={{ display: "flex", gap: 8, alignItems: "center", zIndex: 4 }}>
           {lyrics?.synced.length ? (
-            <div className="seg" style={{ background: "rgba(255,255,255,0.12)" }}>
+            <div className="seg fs-chip">
               <button onClick={() => setLyricsOffset(lyricsOffsetMs - 200)}>−200</button>
               <button onClick={() => setLyricsOffset(0)} title={t("lyricsOffset")}>
                 {lyricsOffsetMs === 0 ? t("lyricsOffset") : `${lyricsOffsetMs}ms`}
@@ -170,8 +170,8 @@ export function Fullscreen() {
             </div>
           ) : null}
           <button
-            className="pill"
-            style={{ background: "rgba(255,255,255,0.12)", color: rate !== 1 ? "var(--accent)" : undefined, fontWeight: 700 }}
+            className="pill fs-chip"
+            style={{ color: rate !== 1 ? "var(--accent)" : undefined, fontWeight: 700 }}
             onClick={() => setRate(RATES[(RATES.indexOf(rate) + 1) % RATES.length] ?? 1)}
             title={t("speed")}
           >

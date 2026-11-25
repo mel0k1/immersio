@@ -157,7 +157,7 @@ const ru: Dict = {
   pitchLockDesc: "Тон не меняется при ускорении или замедлении",
   discordIdDesc: "Rich Presence работает сразу; здесь можно указать ID своего приложения Discord",
   ambient: "Живой фон",
-  ambientDesc: "Анимированный фон из обложки в полном плеере",
+  ambientDesc: "Мягкие переливы в цветах обложки в полном плеере",
   cacheLimit: "Лимит кэша",
   cacheLimitDesc: "Старые файлы вытесняются при превышении",
   cacheUnlimited: "Без лимита",
@@ -180,6 +180,8 @@ const ru: Dict = {
   scQueue: "Очередь",
   scSearch: "Поиск",
 };
+
+LOCALES.ru = ru;
 
 const en: Dict = {
   home: "Home",
@@ -332,7 +334,7 @@ const en: Dict = {
   pitchLockDesc: "Keeps the pitch unchanged at higher or lower speed",
   discordIdDesc: "Rich Presence works out of the box; set your own Discord application ID here to override",
   ambient: "Ambient background",
-  ambientDesc: "Animated cover-art background in the fullscreen player",
+  ambientDesc: "Soft color wash derived from the cover art in the fullscreen player",
   cacheLimit: "Cache limit",
   cacheLimitDesc: "Oldest files are evicted once the limit is reached",
   cacheUnlimited: "No limit",
@@ -355,6 +357,8 @@ const en: Dict = {
   scQueue: "Queue",
   scSearch: "Search",
 };
+
+LOCALES.en = en;
 
 export function tKey(lang: Locale, key: string): string {
   return LOCALES[lang]?.[key] ?? en[key] ?? ru[key] ?? key;
