@@ -191,13 +191,15 @@ mod inner {
         let handle = app.clone();
         tauri::async_runtime::spawn(async move {
             let (ctx, mut crx) = tokio::sync::mpsc::unbounded_channel::<String>();
-            let result = connection::Builder::session()
+            let builder = connection::Builder::session()
                 .and_then(|b| b.name("org.mpris.MediaPlayer2.immersio"))
                 .and_then(|b| b.serve_at("/org/mpris/MediaPlayer2", Root))
-                .and_then(|b| b.serve_at("/org/mpris/MediaPlayer2", Player { rx, ctl: ctx }))
-                .and_then(|b| b.build());
-            let conn = match result {
-                Ok(c) => c,
+                .and_then(|b| b.serve_at("/org/mpris/MediaPlayer2", Player { rx, ctl: ctx }));
+            let conn = match builder {
+                Ok(b) => match b.build().await {
+                    Ok(c) => c,
+                    Err(_) => return,
+                },
                 Err(_) => return,
             };
             let ctxt = match SignalContext::new(&conn, "/org/mpris/MediaPlayer2") {

@@ -175,8 +175,13 @@ pub async fn handle(app: &AppHandle, request: Request<Vec<u8>>) -> Response<Vec<
     }
     let cache_max = app
         .try_state::<crate::commands::AppState>()
-        .and_then(|s| s.cache_max.read().ok())
-        .map(|g| *g)
+        .map(|s| {
+            s.cache_max
+                .read()
+                .ok()
+                .map(|g| *g)
+                .unwrap_or(2_000_000_000)
+        })
         .unwrap_or(2_000_000_000);
 
     // 2. Fresh full download: cache to disk while responding.
