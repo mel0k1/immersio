@@ -67,7 +67,7 @@ export const useSettings = create<SettingsState>()(
   persist(
     (set) => ({
       lang: "ru",
-      accent: "#7c5cff",
+      accent: "#ff4d4d",
       theme: "dark",
       glass: true,
       ambient: true,

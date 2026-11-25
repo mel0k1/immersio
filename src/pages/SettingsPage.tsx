@@ -8,7 +8,7 @@ import { api } from "../lib/ipc";
 import { comboOf, comboLabel } from "../lib/shortcuts";
 import { EQ_FREQS } from "../lib/audio";
 
-const ACCENTS = ["#7c5cff", "#ff5c7c", "#3ecf8e", "#4d71ff", "#2dd4bf", "#f97316", "#a78bfa", "#ef4444", "#38bdf8", "#84cc16", "#e879f9", "#ffb020", "#e8e8ee"];
+const ACCENTS = ["#ff4d4d", "#ff8a8a", "#ff5c7c", "#3ecf8e", "#4d71ff", "#2dd4bf", "#f97316", "#a78bfa", "#ef4444", "#38bdf8", "#84cc16", "#e879f9", "#ffb020", "#e8e8ee"];
 
 const LANGS: [Locale, string][] = [
   ["ru", "Русский"],

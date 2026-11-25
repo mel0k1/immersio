@@ -54,7 +54,7 @@ export function Hero({
   const color = useHeroColor(cover);
   const t = useT();
   return (
-    <div className="hero" style={{ ["--hero-color" as string]: color ?? "#7c5cff" }}>
+    <div className="hero" style={{ ["--hero-color" as string]: color ?? "var(--accent)" }}>
       <div className="hero-glass" />
       <div className="hero-top">
         <div style={{ width: 180, height: 180, borderRadius: round ? "999px" : 14, overflow: "hidden", boxShadow: "0 16px 40px rgba(0,0,0,.55)", flexShrink: 0 }}>
