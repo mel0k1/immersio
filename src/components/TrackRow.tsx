@@ -18,9 +18,11 @@ interface Props {
   queue?: Playable[];
   onRemove?: () => void;
   showAlbumLink?: boolean;
+  /** album pages: rows go number → title like Liner, no cover */
+  hideCover?: boolean;
 }
 
-export function TrackRow({ raw, track, index, queue, onRemove, showAlbumLink = true }: Props) {
+export function TrackRow({ raw, track, index, queue, onRemove, showAlbumLink = true, hideCover = false }: Props) {
   const t = useT();
   const nav = useNavigate();
   const liked = useLibrary((s) => s.liked.some((x) => x.videoId === track.videoId));
@@ -121,9 +123,11 @@ export function TrackRow({ raw, track, index, queue, onRemove, showAlbumLink = t
         )}
       </div>
       <div className="tr-main" onDoubleClick={play}>
-        <div className="tr-thumb-wrap">
-          <Cover src={track.thumb ?? track.coverPath ?? undefined} />
-        </div>
+        {!hideCover && (
+          <div className="tr-thumb-wrap">
+            <Cover src={track.thumb ?? track.coverPath ?? undefined} />
+          </div>
+        )}
         <div className="tr-titles">
           <div className="tr-title">
             <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{track.title}</span>

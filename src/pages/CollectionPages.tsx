@@ -181,7 +181,7 @@ export function CollectionPage({ kind }: { kind: "album" | "playlist" }) {
       <SearchFilter value={q} onChange={setQ} />
       <div className="track-list">
         {filtered.map((tr, i) => (
-          <TrackRow key={`${tr.videoId}-${i}`} raw={tr} track={playableOf(tr)} index={i} queue={playable} />
+          <TrackRow key={`${tr.videoId}-${i}`} raw={tr} track={playableOf(tr)} index={i} queue={playable} hideCover={info.kind === "album"} />
         ))}
       </div>
       {info.tracks.length === 0 && <div className="state-block">{t("emptySearch")}</div>}

@@ -204,6 +204,44 @@ img {
 .side-spacer {
   flex: 1;
 }
+.side-tiles {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: center;
+  margin-top: 8px;
+  min-height: 0;
+  overflow: hidden;
+  scrollbar-width: none;
+}
+.side-tiles::-webkit-scrollbar {
+  display: none;
+}
+.side-tile {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  overflow: hidden;
+  flex-shrink: 0;
+  transition: transform 0.18s var(--ease);
+}
+.side-tile:hover {
+  transform: scale(1.08);
+}
+.side-tile:first-child {
+  background: linear-gradient(135deg, var(--accent), rgba(16, 16, 20, 0.9));
+  display: grid;
+  place-items: center;
+  color: #fff;
+}
+.side-tile .cover-ph {
+  width: 100%;
+  height: 100%;
+}
+.side-tile .cover-ph svg {
+  width: 22px;
+  height: 22px;
+}
 
 .main {
   display: grid;

@@ -8,6 +8,7 @@ import { useT } from "../lib/i18n";
 import { Section, CollectionCard } from "../components/Cards";
 import { TrackRow } from "../components/TrackRow";
 import { Cover } from "../components/Cover";
+import { mixArt } from "../lib/mixArt";
 
 function shuffleArr<T>(arr: T[]): T[] {
   const a = [...arr];
@@ -120,7 +121,7 @@ export function HomePage() {
                 key={i}
                 title={`${t("mixOf")} ${i + 1}`}
                 subtitle={mix[0]?.artists.slice(0, 2).join(", ") || t("mixOf")}
-                cover={mix[0]?.thumb}
+                cover={mixArt(i + 1)}
                 kind="none"
                 onOpen={() => playContext(shuffleArr(mix), 0)}
                 onPlay={() => playContext(shuffleArr(mix), 0)}
