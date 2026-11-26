@@ -50,6 +50,11 @@
   --panel: var(--bg-soft);
   --panel-border: rgba(255, 255, 255, 0.08);
   --panel-blur: none;
+  /* the player bar carries its own tint, distinct from the canvas —
+     like Liner's bg-glass / bg-primary floating over bg-canvas */
+  --bar-bg: #151517;
+  --bar-blur: none;
+  --bar-fade: rgba(21, 21, 23, 0.55);
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
   /* spring approximation of Liner's framer springs (stiffness 260-320, damping 20-22) */
   --spring: cubic-bezier(0.3, 1.25, 0.4, 1);
@@ -60,10 +65,15 @@
   --panel: rgba(22, 22, 24, 0.9);
   --panel-border: rgba(255, 255, 255, 0.08);
   --panel-blur: blur(32px) saturate(1.5);
+  --bar-bg: rgba(70, 70, 70, 0.2);
+  --bar-blur: blur(48px) saturate(1.5);
+  --bar-fade: rgba(70, 70, 70, 0.16);
 }
 [data-theme="light"][data-glass="on"] {
   --panel: rgba(245, 245, 247, 0.92);
   --panel-border: rgba(0, 0, 0, 0.06);
+  --bar-bg: rgba(255, 255, 255, 0.55);
+  --bar-fade: rgba(255, 255, 255, 0.4);
 }
 .app-bg {
   position: fixed;
@@ -151,7 +161,9 @@ img {
 .app-frame {
   display: grid;
   grid-template-columns: var(--side-w) 1fr;
-  grid-template-rows: minmax(0, 1fr) var(--bar-h);
+  /* single row: the sidebar column runs the full window height and the player
+     floats over the main column's bottom edge, like Liner's shell */
+  grid-template-rows: minmax(0, 1fr);
   height: 100%;
   position: relative;
 }
@@ -318,7 +330,7 @@ img {
 }
 
 .page {
-  padding: 64px 28px 28px;
+  padding: 64px 28px calc(var(--bar-h) + 24px);
   max-width: 1600px;
 }
 
@@ -913,20 +925,35 @@ img {
 }
 
 .player-bar {
-  grid-column: 1 / -1;
-  grid-row: 2;
-  height: var(--bar-h);
-  margin: 0;
+  /* floating panel over the scrolling content, like Liner's embedded MiniPlayer:
+     own tint, heavy glass blur, content dissolves into it through the top halo.
+     Anchored to the frame, offset past the sidebar so the rail runs full height */
+  position: absolute;
+  left: calc(var(--side-w) + 12px);
+  right: 12px;
+  bottom: 12px;
+  height: calc(var(--bar-h) - 12px);
   display: grid;
   grid-template-columns: 1fr auto 1fr;
   align-items: center;
   gap: 16px;
   padding: 0 18px;
-  background: var(--panel);
-  backdrop-filter: var(--panel-blur);
-  -webkit-backdrop-filter: var(--panel-blur);
-  border-top: 1px solid var(--panel-border);
+  background: var(--bar-bg);
+  backdrop-filter: var(--bar-blur);
+  -webkit-backdrop-filter: var(--bar-blur);
+  border-radius: 18px;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.3);
   z-index: 40;
+}
+.player-bar::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 100%;
+  height: 72px;
+  background: linear-gradient(to top, var(--bar-fade), transparent);
+  pointer-events: none;
 }
 .pb-left {
   display: flex;
@@ -1057,7 +1084,7 @@ img {
   position: absolute;
   top: 0;
   right: 0;
-  bottom: 6px;
+  bottom: calc(var(--bar-h) + 6px);
   width: min(360px, 90vw);
   background: var(--panel);
   backdrop-filter: var(--panel-blur);
@@ -1769,6 +1796,8 @@ img {
   --accent: #ff3b3b;
   --btn-primary-bg: #18181b;
   --btn-primary-text: #ffffff;
+  --bar-bg: #ffffff;
+  --bar-fade: rgba(255, 255, 255, 0.55);
 }
 
 [data-theme="light"] .fullscreen,
