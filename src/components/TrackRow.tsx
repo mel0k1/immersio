@@ -20,9 +20,11 @@ interface Props {
   showAlbumLink?: boolean;
   /** album pages: rows go number → title like Liner, no cover */
   hideCover?: boolean;
+  /** album pages: artist line repeats the hero, hide it */
+  hideArtist?: boolean;
 }
 
-export function TrackRow({ raw, track, index, queue, onRemove, showAlbumLink = true, hideCover = false }: Props) {
+export function TrackRow({ raw, track, index, queue, onRemove, showAlbumLink = true, hideCover = false, hideArtist = false }: Props) {
   const t = useT();
   const nav = useNavigate();
   const liked = useLibrary((s) => s.liked.some((x) => x.videoId === track.videoId));
@@ -110,7 +112,7 @@ export function TrackRow({ raw, track, index, queue, onRemove, showAlbumLink = t
   }
 
   return (
-    <div className={`track-row${isCurrent ? " playing" : ""}`} onContextMenu={(e) => (items.length ? (e.preventDefault(), setMenu({ x: e.clientX, y: e.clientY })) : undefined)}>
+    <div className={`track-row${hideArtist ? " compact" : ""}${isCurrent ? " playing" : ""}`} onContextMenu={(e) => (items.length ? (e.preventDefault(), setMenu({ x: e.clientX, y: e.clientY })) : undefined)}>
       <div className="tr-idx">
         {isPlaying ? (
           <span className="eq">
@@ -134,7 +136,7 @@ export function TrackRow({ raw, track, index, queue, onRemove, showAlbumLink = t
             {track.explicit && <span className="explicit-badge">E</span>}
             {track.localId && <span className="card-badge" style={{ position: "static" }}>{t("localBadge")}</span>}
           </div>
-          <div className="tr-artist">
+          <div className="tr-artist" style={hideArtist ? { display: "none" } : undefined}>
             {(track.artists ?? []).length > 0 ? (
               track.artists.map((a, i) => (
                 <span key={`${a}-${i}`}>

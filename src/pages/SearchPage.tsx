@@ -5,7 +5,7 @@ import { api } from "../lib/ipc";
 import { bestThumb, playableOf, type CollectionItem, type SearchResults, type TrackItem } from "../types";
 import { useT } from "../lib/i18n";
 import { TrackRow } from "../components/TrackRow";
-import { CollectionCard } from "../components/Cards";
+import { CollectionCard, Section } from "../components/Cards";
 
 const TABS = ["all", "track", "video", "album", "artist", "playlist", "soundcloud"] as const;
 type Tab = (typeof TABS)[number];
@@ -75,9 +75,11 @@ export function SearchPage() {
   const [tab, setTab] = useState<Tab>("all");
   const [history, setHistory] = useState<string[]>(loadHistory());
   const inputRef = useRef<HTMLInputElement>(null);
+  const lastRunRef = useRef<string>("");
 
   const run = (q: string) => {
     if (!q.trim()) return;
+    lastRunRef.current = q;
     setParams({ q });
     setInput(q);
     setLoading(true);
@@ -99,8 +101,10 @@ export function SearchPage() {
   };
 
   useEffect(() => {
-    if (urlQ && urlQ !== input) run(urlQ);
+    // run on any q change, including a direct /search?q=… open (input already holds it)
+    if (urlQ && lastRunRef.current !== urlQ) run(urlQ);
     if (!urlQ) {
+      lastRunRef.current = "";
       setRes(null);
       setLoading(false);
     }
@@ -144,15 +148,11 @@ export function SearchPage() {
         />
       </div>
       {history.length > 0 && !urlQ && (
-        <div style={{ marginTop: 22 }}>
-          <div className="section-title" style={{ marginBottom: 10 }}>{t("search")}</div>
+        <div className="search-history">
+          <div className="section-title" style={{ marginBottom: 10 }}>{t("searchHistory")}</div>
           {history.map((h) => (
-            <button
-              key={h}
-              className="menu-item"
-              style={{ color: "var(--text-dim)", padding: "8px 4px" }}
-              onClick={() => run(h)}
-            >
+            <button key={h} className="search-history-item" onClick={() => run(h)}>
+              <SearchIcon size={15} />
               {h}
             </button>
           ))}
@@ -160,7 +160,7 @@ export function SearchPage() {
       )}
       {urlQ && (
         <>
-          <div className="pills" style={{ margin: "22px 0 18px" }}>
+          <div className="pills" style={{ margin: "20px 0 4px" }}>
             {TABS.filter((tb) => tb === "all" || kindsAvailable.has(tb) || (tb === "soundcloud" && scTracks.length > 0)).map((tb) => (
               <button key={tb} className={`pill${tab === tb ? " active" : ""}`} onClick={() => setTab(tb)}>
                 {tb === "all" ? t("resultsAll") : tb === "soundcloud" ? t("soundcloud") : t(tb === "track" ? "tracks" : tb === "artist" ? "artists" : (tb as string))}
@@ -171,67 +171,124 @@ export function SearchPage() {
           {!loading && (
             <>
               {(tab === "all" || tab === "track") && merged.length > 0 && (
-                <div className="track-list" style={{ marginTop: 10 }}>
-                  {merged.slice(0, tab === "all" ? 8 : undefined).map((tr, i) => (
-                    <TrackRow key={tr.videoId} raw={tr} track={playableOf(tr)} index={i} queue={mergedQueue} />
-                  ))}
-                </div>
+                <Section title={t("tracks")}>
+                  <div className="track-list">
+                    {merged.slice(0, tab === "all" ? 8 : undefined).map((tr, i) => (
+                      <TrackRow key={tr.videoId} raw={tr} track={playableOf(tr)} index={i} queue={mergedQueue} />
+                    ))}
+                  </div>
+                </Section>
               )}
               {(tab === "all" || tab === "album") && collectionsOf("album").length > 0 && (
-                <div className="grid-cards" style={{ marginTop: 18 }}>
-                  {collectionsOf("album").map((c) => (
-                    <CollectionCard
-                      key={c.browseId}
-                      title={c.title}
-                      subtitle={c.subtitle}
-                      cover={bestThumb(c.thumbs)}
-                      kind="album"
-                      onOpen={() => nav(`/album/${c.browseId}`)}
-                    />
-                  ))}
-                </div>
+                <Section title={t("albums")}>
+                  {tab === "all" ? (
+                    <div className="row-of-cards">
+                      {collectionsOf("album").slice(0, 8).map((c) => (
+                        <CollectionCard
+                          key={c.browseId}
+                          title={c.title}
+                          subtitle={c.subtitle}
+                          cover={bestThumb(c.thumbs)}
+                          kind="album"
+                          onOpen={() => nav(`/album/${c.browseId}`)}
+                        />
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="grid-cards">
+                      {collectionsOf("album").map((c) => (
+                        <CollectionCard
+                          key={c.browseId}
+                          title={c.title}
+                          subtitle={c.subtitle}
+                          cover={bestThumb(c.thumbs)}
+                          kind="album"
+                          onOpen={() => nav(`/album/${c.browseId}`)}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </Section>
               )}
               {(tab === "all" || tab === "artist") && collectionsOf("artist").length > 0 && (
-                <div className="grid-cards" style={{ marginTop: 18 }}>
-                  {collectionsOf("artist").map((c) => (
-                    <CollectionCard
-                      key={c.browseId}
-                      title={c.title}
-                      subtitle={c.subtitle || t("artists")}
-                      cover={bestThumb(c.thumbs)}
-                      kind="artist"
-                      onOpen={() => nav(`/artist/${c.browseId}`)}
-                    />
-                  ))}
-                </div>
+                <Section title={t("artists")}>
+                  {tab === "all" ? (
+                    <div className="row-of-cards">
+                      {collectionsOf("artist").slice(0, 8).map((c) => (
+                        <CollectionCard
+                          key={c.browseId}
+                          title={c.title}
+                          subtitle={c.subtitle || t("artists")}
+                          cover={bestThumb(c.thumbs)}
+                          kind="artist"
+                          onOpen={() => nav(`/artist/${c.browseId}`)}
+                        />
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="grid-cards">
+                      {collectionsOf("artist").map((c) => (
+                        <CollectionCard
+                          key={c.browseId}
+                          title={c.title}
+                          subtitle={c.subtitle || t("artists")}
+                          cover={bestThumb(c.thumbs)}
+                          kind="artist"
+                          onOpen={() => nav(`/artist/${c.browseId}`)}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </Section>
               )}
               {(tab === "all" || tab === "playlist") && collectionsOf("playlist").length > 0 && (
-                <div className="grid-cards" style={{ marginTop: 18 }}>
-                  {collectionsOf("playlist").map((c) => (
-                    <CollectionCard
-                      key={c.browseId}
-                      title={c.title}
-                      subtitle={c.subtitle}
-                      cover={bestThumb(c.thumbs)}
-                      kind="playlist"
-                      onOpen={() => nav(`/playlist/${c.browseId}`)}
-                    />
-                  ))}
-                </div>
+                <Section title={t("playlists")}>
+                  {tab === "all" ? (
+                    <div className="row-of-cards">
+                      {collectionsOf("playlist").slice(0, 8).map((c) => (
+                        <CollectionCard
+                          key={c.browseId}
+                          title={c.title}
+                          subtitle={c.subtitle}
+                          cover={bestThumb(c.thumbs)}
+                          kind="playlist"
+                          onOpen={() => nav(`/playlist/${c.browseId}`)}
+                        />
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="grid-cards">
+                      {collectionsOf("playlist").map((c) => (
+                        <CollectionCard
+                          key={c.browseId}
+                          title={c.title}
+                          subtitle={c.subtitle}
+                          cover={bestThumb(c.thumbs)}
+                          kind="playlist"
+                          onOpen={() => nav(`/playlist/${c.browseId}`)}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </Section>
               )}
               {tab === "video" && tracksOf("video").length > 0 && (
-                <div className="track-list" style={{ marginTop: 10 }}>
-                  {tracksOf("video").map((tr, i) => (
-                    <TrackRow key={tr.videoId} raw={tr} track={playableOf(tr)} index={i} queue={queueOf("video")} />
-                  ))}
-                </div>
+                <Section title="YouTube">
+                  <div className="track-list">
+                    {tracksOf("video").map((tr, i) => (
+                      <TrackRow key={tr.videoId} raw={tr} track={playableOf(tr)} index={i} queue={queueOf("video")} />
+                    ))}
+                  </div>
+                </Section>
               )}
               {tab === "soundcloud" && scTracks.length > 0 && (
-                <div className="track-list" style={{ marginTop: 10 }}>
-                  {scTracks.map((tr, i) => (
-                    <TrackRow key={tr.videoId} raw={tr} track={playableOf(tr)} index={i} queue={scTracks.map(playableOf)} />
-                  ))}
-                </div>
+                <Section title={t("soundcloud")}>
+                  <div className="track-list">
+                    {scTracks.map((tr, i) => (
+                      <TrackRow key={tr.videoId} raw={tr} track={playableOf(tr)} index={i} queue={scTracks.map(playableOf)} />
+                    ))}
+                  </div>
+                </Section>
               )}
               {!loading &&
                 merged.length === 0 &&

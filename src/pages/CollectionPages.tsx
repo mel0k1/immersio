@@ -8,7 +8,7 @@ import { useT } from "../lib/i18n";
 import { fmtTotal } from "../lib/format";
 import { TrackRow } from "../components/TrackRow";
 import { Cover } from "../components/Cover";
-import { CollectionCard } from "../components/Cards";
+import { CollectionCard, Section } from "../components/Cards";
 import { dominantColor } from "../lib/cover";
 
 function useHeroColor(cover: string | null) {
@@ -37,20 +37,24 @@ function filterTracks(tracks: TrackItem[], q: string): TrackItem[] {
 export function Hero({
   kind,
   title,
+  subtitle,
   cover,
   meta,
   onPlayAll,
   onShuffle,
   extra,
+  tools,
   round,
 }: {
   kind: string;
   title: string;
+  subtitle?: React.ReactNode;
   cover: string | null;
   meta: React.ReactNode;
   onPlayAll: () => void;
   onShuffle?: () => void;
   extra?: React.ReactNode;
+  tools?: React.ReactNode;
   round?: boolean;
 }) {
   const color = useHeroColor(cover);
@@ -59,32 +63,29 @@ export function Hero({
     <div className="hero" style={{ ["--hero-color" as string]: color ?? "var(--accent)" }}>
       <div className="hero-glass" />
       <div className="hero-top">
-        <div style={{ width: 180, height: 180, borderRadius: round ? "999px" : 14, overflow: "hidden", boxShadow: "0 16px 40px rgba(0,0,0,.55)", flexShrink: 0 }}>
+        <div style={{ width: 140, height: 140, borderRadius: round ? "999px" : 10, overflow: "hidden", boxShadow: "0 16px 40px rgba(0,0,0,.55)", flexShrink: 0 }}>
           <Cover src={cover} round={round} />
         </div>
         <div style={{ minWidth: 0 }}>
           <div className="hero-kind">{kind}</div>
           <h1 className="hero-title">{title}</h1>
+          {subtitle && <div className="hero-sub">{subtitle}</div>}
           <div className="hero-meta">{meta}</div>
         </div>
       </div>
       <div className="hero-actions">
-        <button className="btn primary" onClick={onPlayAll}>
-          <Play size={17} fill="currentColor" />
+        <button className="btn sm primary" onClick={onPlayAll}>
+          <Play size={16} fill="currentColor" />
           {t("playAll")}
         </button>
         {onShuffle && (
-          <button className="btn" onClick={onShuffle}>
+          <button className="btn sm icon-only" title={t("shuffle")} onClick={onShuffle}>
             <Shuffle size={16} />
-            {t("shuffle")}
           </button>
         )}
-        {extra && (
-          <>
-            <div className="spacer" />
-            {extra}
-          </>
-        )}
+        <div className="spacer" />
+        {tools}
+        {extra && extra}
       </div>
     </div>
   );
@@ -107,8 +108,8 @@ function SaveButton({ item }: { item: { browseId: string; kind: "album" | "playl
   const saved = useLibrary((s) => s.saved.some((x) => x.browseId === item.browseId));
   const toggleSaved = useLibrary((s) => s.toggleSaved);
   return (
-    <button className="btn" onClick={() => toggleSaved(item)}>
-      {saved ? <Check size={16} /> : <Plus size={16} />}
+    <button className="btn sm" onClick={() => toggleSaved(item)}>
+      {saved ? <Check size={15} /> : <Plus size={15} />}
       {saved ? t("inLibrary") : t("saveToLibrary")}
     </button>
   );
@@ -144,12 +145,16 @@ export function CollectionPage({ kind }: { kind: "album" | "playlist" }) {
     return { tracks, cover, owners, year, total, title: data.title, browseId: data.browseId, kind: data.kind === "album" ? ("album" as const) : ("playlist" as const) };
   }, [data]);
 
-  const filtered = useMemo(() => (info ? filterTracks(info.tracks, q) : []), [info, q]);
+  // keep each track's position in the release order, filtering only hides rows
+  const filtered = useMemo(
+    () => (info ? info.tracks.map((tr, i) => ({ tr, i })).filter(({ tr }) => filterTracks([tr], q).length > 0) : []),
+    [info, q],
+  );
 
   if (fail) return <div className="page"><div className="state-block">{t("emptySearch")}</div></div>;
   if (!info) return <div className="page"><div className="state-block"><span className="spin" /></div></div>;
 
-  const playable = filtered.map(playableOf);
+  const playable = filtered.map(({ tr }) => playableOf(tr));
   const fullPlayable = info.tracks.map(playableOf);
 
   return (
@@ -157,16 +162,21 @@ export function CollectionPage({ kind }: { kind: "album" | "playlist" }) {
       <Hero
         kind={kind === "album" ? t("albums") : t("playlists")}
         title={info.title}
+        subtitle={
+          info.owners.length > 0 ? (
+            info.owners.map((o, i) => (
+              <span key={i}>
+                <b onClick={() => nav(`/search?q=${encodeURIComponent(o)}`)}>{o}</b>
+                {i < info.owners.length - 1 && <span style={{ color: "var(--text-faint)" }}>,</span>}
+              </span>
+            ))
+          ) : undefined
+        }
         cover={info.cover}
         meta={
           <>
-            {info.owners.map((o, i) => (
-              <b key={i} onClick={() => nav(`/search?q=${encodeURIComponent(o)}`)}>
-                {o}
-              </b>
-            ))}
             {info.year && <span>{info.year}</span>}
-            <span className="hero-chip">
+            <span>
               {info.tracks.length} {t("songsCount")}
             </span>
             {info.total > 0 && <span>{fmtTotal(info.total, "ru")}</span>}
@@ -176,12 +186,12 @@ export function CollectionPage({ kind }: { kind: "album" | "playlist" }) {
         onShuffle={() =>
           info.tracks.length > 0 && playContext(fullPlayable, Math.floor(Math.random() * info.tracks.length))
         }
+        tools={<SearchFilter value={q} onChange={setQ} />}
         extra={<SaveButton item={{ browseId: info.browseId, kind: info.kind, title: info.title, subtitle: info.owners.join(", "), thumbs: data && data.kind !== "artist" ? data.thumbs : [] }} />}
       />
-      <SearchFilter value={q} onChange={setQ} />
       <div className="track-list">
-        {filtered.map((tr, i) => (
-          <TrackRow key={`${tr.videoId}-${i}`} raw={tr} track={playableOf(tr)} index={i} queue={playable} hideCover={info.kind === "album"} />
+        {filtered.map(({ tr, i }) => (
+          <TrackRow key={`${tr.videoId}-${i}`} raw={tr} track={playableOf(tr)} index={i} queue={playable} hideCover={info.kind === "album"} hideArtist={info.kind === "album"} />
         ))}
       </div>
       {info.tracks.length === 0 && <div className="state-block">{t("emptySearch")}</div>}
@@ -210,13 +220,17 @@ export function ArtistPage() {
   }, [browseId]);
 
   const artist = data?.kind === "artist" ? data : null;
-  const filtered = useMemo(() => filterTracks(artist?.topTracks ?? [], q), [artist, q]);
+  // top-tracks numbering follows the source order while the filter hides rows
+  const filtered = useMemo(
+    () => (artist ? artist.topTracks.map((tr, i) => ({ tr, i })).filter(({ tr }) => filterTracks([tr], q).length > 0) : []),
+    [artist, q],
+  );
 
   if (fail) return <div className="page"><div className="state-block">{t("emptySearch")}</div></div>;
   if (!artist) return <div className="page"><div className="state-block"><span className="spin" /></div></div>;
 
   const cover = bestThumb(artist.thumbs);
-  const playable = filtered.map(playableOf);
+  const playable = filtered.map(({ tr }) => playableOf(tr));
 
   return (
     <div className="page">
@@ -233,33 +247,33 @@ export function ArtistPage() {
           ) : null
         }
         onPlayAll={() => artist.topTracks.length > 0 && playContext(artist.topTracks.map(playableOf), 0)}
+        tools={<SearchFilter value={q} onChange={setQ} />}
         extra={
           <>
             <button
-              className="btn"
+              className="btn sm"
               onClick={() => {
                 artist.topTracks.forEach((tr) => usePlayer.getState().addToQueue(playableOf(tr)));
                 useUi.getState().showToast(`${t("addToQueue")}: +${artist.topTracks.length}`);
               }}
             >
-              <ListPlus size={16} />
+              <ListPlus size={15} />
               {t("addToQueue")}
             </button>
             <SaveButton item={{ browseId: artist.browseId, kind: "artist", title: artist.name, subtitle: t("artists"), thumbs: artist.thumbs }} />
           </>
         }
       />
-      <div className="section-title" style={{ margin: "26px 0 12px" }}>{t("topTracks")}</div>
-      <SearchFilter value={q} onChange={setQ} />
-      <div className="track-list">
-        {filtered.map((tr, i) => (
-          <TrackRow key={tr.videoId} raw={tr} track={playableOf(tr)} index={i} queue={playable} />
-        ))}
-      </div>
-      {artist.topTracks.length === 0 && <div className="state-block">{t("emptySearch")}</div>}
+      <Section title={t("topTracks")}>
+        <div className="track-list">
+          {filtered.map(({ tr, i }) => (
+            <TrackRow key={tr.videoId} raw={tr} track={playableOf(tr)} index={i} queue={playable} />
+          ))}
+        </div>
+        {artist.topTracks.length === 0 && <div className="state-block">{t("emptySearch")}</div>}
+      </Section>
       {artist.albums.length > 0 && (
-        <>
-          <div className="section-title" style={{ margin: "30px 0 12px" }}>{t("singles")}</div>
+        <Section title={t("singles")}>
           <div className="row-of-cards">
             {artist.albums.map((c) => (
               <CollectionCard
@@ -272,7 +286,7 @@ export function ArtistPage() {
               />
             ))}
           </div>
-        </>
+        </Section>
       )}
     </div>
   );

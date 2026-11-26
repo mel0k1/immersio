@@ -61,21 +61,21 @@ export function LikedPage() {
         round={false}
         meta={
           <>
-            <span className="hero-chip">
+            <span>
               {liked.length} {fmtPlural(liked.length, ["трек", "трека", "треков"])}
             </span>
             {total > 0 && <span>{fmtTotal(total, "ru")}</span>}
           </>
         }
         onPlayAll={() => liked.length > 0 && playContext(liked.map(playableOf), 0)}
+        tools={<SearchFilter value={q} onChange={setQ} />}
         extra={
-          <button className="btn" disabled={dlState !== null} onClick={downloadAll}>
-            <Download size={16} />
+          <button className="btn sm" disabled={dlState !== null} onClick={downloadAll}>
+            <Download size={15} />
             {dlState ?? t("downloadAll")}
           </button>
         }
       />
-      <SearchFilter value={q} onChange={setQ} />
       <div className="track-list">
         {filtered.map((tr, i) => (
           <TrackRow key={tr.videoId} raw={tr as TrackItem} track={playableOf(tr)} index={i} queue={playable} />
@@ -122,28 +122,26 @@ export function MyPlaylistPage() {
         title={playlist.name}
         cover={bestThumb(tracks.find((tr) => bestThumb(tr.thumbs))?.thumbs)}
         meta={
-          <>
-            <span className="hero-chip">
-              {tracks.length} {fmtPlural(tracks.length, ["трек", "трека", "треков"])}
-            </span>
-          </>
+          <span>
+            {tracks.length} {fmtPlural(tracks.length, ["трек", "трека", "треков"])}
+          </span>
         }
         onPlayAll={() => tracks.length > 0 && playContext(tracks.map(playableOf), 0)}
+        tools={<SearchFilter value={q} onChange={setQ} />}
         extra={
           <button
-            className="btn"
+            className="btn sm"
             onClick={() => {
               deletePlaylist(playlist.id);
               showToast(t("remove"));
               nav("/library");
             }}
           >
-            <Trash2 size={16} />
+            <Trash2 size={15} />
             {t("remove")}
           </button>
         }
       />
-      <SearchFilter value={q} onChange={setQ} />
       <div className="track-list">
         {filtered.map((tr, i) => (
           <TrackRow

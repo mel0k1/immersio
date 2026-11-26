@@ -1,13 +1,28 @@
 import { invoke, convertFileSrc } from "@tauri-apps/api/core";
 import type { Browse, ImportResult, Lyrics, LocalTrack, SearchResults, StreamInfo, TrackItem } from "../types";
+import { demoBrowse, demoScSearch, demoSearch } from "./demo";
+import { isTauri } from "./env";
+
+/** In a plain browser (vite dev / qa) there is no backend — serve demo data so pages render. */
+const wrap = <A extends unknown[], R>(fn: (...a: A) => Promise<R>, demo: (...a: A) => R): ((...a: A) => Promise<R>) =>
+  isTauri
+    ? fn
+    : (...args: A) =>
+        new Promise<R>((resolve) => setTimeout(() => resolve(demo(...args)), 150));
 
 export const api = {
-  search: (query: string, hl: string) =>
-    invoke<SearchResults>("yt_search", { query, hl }),
-  searchSoundcloud: (query: string) =>
-    invoke<TrackItem[]>("sc_search", { query }),
-  browse: (browseId: string, hl: string) =>
-    invoke<Browse>("yt_browse", { browseId, hl }),
+  search: wrap(
+    (query: string, hl: string) => invoke<SearchResults>("yt_search", { query, hl }),
+    (_q: string, _hl: string) => demoSearch(),
+  ),
+  searchSoundcloud: wrap(
+    (query: string) => invoke<TrackItem[]>("sc_search", { query }),
+    (_q: string) => demoScSearch(),
+  ),
+  browse: wrap(
+    (browseId: string, hl: string) => invoke<Browse>("yt_browse", { browseId, hl }),
+    (browseId: string) => demoBrowse(browseId),
+  ),
   stream: (videoId: string, hl: string, quality: string) =>
     invoke<StreamInfo>("yt_stream", { videoId, hl, quality }),
   radio: (videoId: string, hl: string) =>

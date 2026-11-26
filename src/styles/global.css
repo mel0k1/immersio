@@ -414,6 +414,31 @@ img {
   color: var(--text-faint);
 }
 
+.search-history {
+  margin-top: 24px;
+}
+.search-history-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  max-width: 560px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  color: var(--text-dim);
+  font-size: 14px;
+  transition: background 0.15s, color 0.15s;
+  text-align: left;
+}
+.search-history-item svg {
+  flex-shrink: 0;
+  opacity: 0.6;
+}
+.search-history-item:hover {
+  background: var(--surface);
+  color: var(--text);
+}
+
 .btn {
   display: inline-flex;
   align-items: center;
@@ -432,6 +457,12 @@ img {
 }
 .btn:active {
   transform: scale(0.97);
+}
+.btn.sm {
+  height: 32px;
+  padding: 0 14px;
+  font-size: 13px;
+  border-radius: 9px;
 }
 .btn.primary {
   background: var(--btn-primary-bg);
@@ -596,6 +627,9 @@ img {
   transition: background 0.15s;
   min-height: 64px;
 }
+.track-row.compact {
+  min-height: 56px;
+}
 .track-row:hover {
   background: var(--surface-2);
 }
@@ -756,35 +790,78 @@ img {
   background: var(--bg-soft);
 }
 .hero-kind {
-  font-size: 12px;
-  font-weight: 700;
+  font-size: 11px;
+  font-weight: 640;
   color: var(--text-dim);
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.1em;
 }
 .hero-title {
-  font-size: clamp(26px, 4.5vw, 46px);
-  font-weight: 700;
-  letter-spacing: -0.03em;
-  line-height: 1.05;
-  margin: 4px 0 10px;
+  font-family: "Roboto Flex", sans-serif;
+  font-weight: 649;
+  font-variation-settings: "wght" 649, "GRAD" 105, "XOPQ" 100, "wdth" 134, "opsz" 144;
+  font-size: clamp(26px, 2.4vw, 30px);
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+  margin: 6px 0 4px;
   word-break: break-word;
+}
+.hero-sub {
+  color: var(--text-dim);
+  font-size: 15px;
+  margin: 0 0 6px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+}
+.hero-sub b {
+  font-weight: 400;
+  cursor: pointer;
+  transition: color 0.15s;
+}
+.hero-sub b:hover {
+  color: var(--text);
 }
 .hero-meta {
   display: flex;
   align-items: center;
-  gap: 10px;
-  color: var(--text-dim);
+  color: var(--text-faint);
   font-size: 13px;
   flex-wrap: wrap;
 }
+/* plain facts separated by dots, like Liner's HeroMeta */
+.hero-meta > * + *::before {
+  content: "·";
+  margin: 0 8px;
+  color: var(--text-faint);
+}
 .hero-meta b {
-  color: var(--text);
-  font-weight: 510;
+  color: var(--text-dim);
+  font-weight: 400;
   cursor: pointer;
 }
 .hero-meta b:hover {
-  text-decoration: underline;
+  color: var(--text);
+}
+.hero-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 18px;
+  flex-wrap: wrap;
+}
+.hero-actions .btn.sm {
+  height: 32px;
+  padding: 0 18px;
+}
+.hero-actions .btn.sm.icon-only {
+  width: 44px;
+  padding: 0;
+  justify-content: center;
+}
+.hero-actions .list-tools {
+  margin-bottom: 0;
 }
 .hero-chip {
   padding: 4px 12px;
