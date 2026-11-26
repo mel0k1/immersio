@@ -80,7 +80,7 @@ export function TrackRow({ raw, track, index, queue, onRemove, showAlbumLink = t
         const ext = raw.videoId.startsWith("sc:") ? "mp3" : "m4a";
         try {
           const path = await save({
-            defaultPath: `${raw.artists[0] ?? ""} - ${raw.title}.${ext}`.replace(/[\\/:*?"<>|]/g, "_"),
+            defaultPath: `${raw.artists?.[0] ?? ""} - ${raw.title}.${ext}`.replace(/[\\/:*?"<>|]/g, "_"),
             filters: [{ name: "Audio", extensions: [ext, "webm"] }],
           });
           if (!path) return;
@@ -93,7 +93,7 @@ export function TrackRow({ raw, track, index, queue, onRemove, showAlbumLink = t
       },
     });
     items.push({ label: "-" });
-    if (raw.artists[0]) {
+    if (raw.artists?.[0]) {
       const artistName = raw.artists[0];
       items.push({ icon: User, label: t("goToArtist"), onClick: () => nav(`/search?q=${encodeURIComponent(artistName)}`) });
     }
@@ -131,7 +131,7 @@ export function TrackRow({ raw, track, index, queue, onRemove, showAlbumLink = t
             {track.localId && <span className="card-badge" style={{ position: "static" }}>{t("localBadge")}</span>}
           </div>
           <div className="tr-artist">
-            {track.artists.length > 0 ? (
+            {(track.artists ?? []).length > 0 ? (
               track.artists.map((a, i) => (
                 <span key={`${a}-${i}`}>
                   {i > 0 && ", "}
@@ -160,6 +160,11 @@ export function TrackRow({ raw, track, index, queue, onRemove, showAlbumLink = t
             title={liked ? t("unlike") : t("like")}
           >
             <Heart size={17} fill={liked ? "currentColor" : "none"} />
+          </button>
+        )}
+        {raw && (
+          <button className="icon-btn" onClick={() => addToPlaylist([raw])} title={t("addToPlaylist")}>
+            <ListPlus size={17} />
           </button>
         )}
         <button

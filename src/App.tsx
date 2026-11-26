@@ -12,6 +12,7 @@ import { Fullscreen } from "./components/Fullscreen";
 import { PlaylistModals, Toast } from "./components/PlaylistModals";
 import { ImportModal } from "./components/ImportModal";
 import { OverlayPage } from "./components/OverlayPage";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 import { HomePage } from "./pages/HomePage";
 import { SearchPage } from "./pages/SearchPage";
 import { LibraryPage } from "./pages/LibraryPage";
@@ -107,7 +108,8 @@ function Shortcuts() {
             artists: t.artists,
             album: t.album ?? null,
             durationSecs: t.durationSecs ?? null,
-            thumbs: [],
+            // keep the artwork: the queue carries only a flat thumb URL
+            thumbs: t.thumb ? [{ url: t.thumb, width: 544, height: 544 }] : [],
             explicit: !!t.explicit,
           });
         }
@@ -221,8 +223,7 @@ function DropOverlay() {
         position: "fixed",
         inset: 12,
         zIndex: 100,
-        background: "rgba(13,13,16,0.55)",
-        backdropFilter: "blur(10px)",
+        background: "rgba(13,13,16,0.72)",
         border: "2px dashed var(--accent)",
         borderRadius: 20,
         display: "grid",
@@ -275,24 +276,30 @@ function Shell() {
       <div className="main">
         <OfflineBanner />
         <div className="content">
-          <Routes>
-            <Route path="/" element={<HomePage />} />
-            <Route path="/search" element={<SearchPage />} />
-            <Route path="/library" element={<LibraryPage />} />
-            <Route path="/liked" element={<LikedPage />} />
-            <Route path="/local" element={<LocalPage />} />
-            <Route path="/myplaylist/:id" element={<MyPlaylistPage />} />
-            <Route path="/album/:browseId" element={<CollectionPage kind="album" />} />
-            <Route path="/playlist/:browseId" element={<CollectionPage kind="playlist" />} />
-            <Route path="/artist/:browseId" element={<ArtistPage />} />
-            <Route path="/settings" element={<SettingsPage />} />
-          </Routes>
+          <ErrorBoundary>
+            <Routes>
+              <Route path="/" element={<HomePage />} />
+              <Route path="/search" element={<SearchPage />} />
+              <Route path="/library" element={<LibraryPage />} />
+              <Route path="/liked" element={<LikedPage />} />
+              <Route path="/local" element={<LocalPage />} />
+              <Route path="/myplaylist/:id" element={<MyPlaylistPage />} />
+              <Route path="/album/:browseId" element={<CollectionPage kind="album" />} />
+              <Route path="/playlist/:browseId" element={<CollectionPage kind="playlist" />} />
+              <Route path="/artist/:browseId" element={<ArtistPage />} />
+              <Route path="/settings" element={<SettingsPage />} />
+            </Routes>
+          </ErrorBoundary>
         </div>
         {queueOpen && <QueueDrawer />}
         <PlayerBar />
       </div>
-      <Fullscreen />
-      <PlaylistModals />
+      <ErrorBoundary compact>
+        <Fullscreen />
+      </ErrorBoundary>
+      <ErrorBoundary compact>
+        <PlaylistModals />
+      </ErrorBoundary>
       <ImportModal />
       <Toast />
       <ErrorToast />

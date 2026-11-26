@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { Play } from "lucide-react";
 import { api } from "../lib/ipc";
 import { playableOf, type Playable, type TrackItem } from "../types";
 import { useLibrary, usePlayer } from "../lib/store";
@@ -68,9 +69,29 @@ export function HomePage() {
 
   const popularRows = popular;
 
+  const wave = () => {
+    if (mixPool.length > 0) playContext(shuffleArr(mixPool), 0);
+    else if (popular.length > 0) playContext(popular.map(playableOf), 0);
+  };
+
+  const hour = new Date().getHours();
+  const greeting = hour >= 5 && hour < 12 ? "goodMorning" : hour >= 12 && hour < 18 ? "goodAfternoon" : hour >= 18 && hour < 23 ? "goodEvening" : "goodNight";
+
   return (
     <div className="page">
-      <h1 className="page-title">{t("home")}</h1>
+      <div className="home-hero">
+        <h1 className="home-hero-title">
+          {t(greeting)}
+          <br />
+          <span style={{ color: "var(--accent)" }}>{t("myWave")}</span>
+        </h1>
+        <div className="hero-actions" style={{ marginTop: 18 }}>
+          <button className="btn primary" onClick={wave}>
+            <Play size={17} fill="currentColor" />
+            {t("playAll")}
+          </button>
+        </div>
+      </div>
       {history.length > 0 && (
         <Section title={t("recent")}>
           <div className="row-of-cards">
@@ -78,7 +99,6 @@ export function HomePage() {
               <div
                 key={`${h.key}-${i}`}
                 className="card"
-                style={{ minWidth: 168, width: 168 }}
                 onClick={() => playContext([h], 0)}
                 role="button"
               >

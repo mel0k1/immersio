@@ -29,7 +29,9 @@ function useHeroColor(cover: string | null) {
 function filterTracks(tracks: TrackItem[], q: string): TrackItem[] {
   const f = q.toLowerCase().trim();
   if (!f) return tracks;
-  return tracks.filter((tr) => tr.title.toLowerCase().includes(f) || tr.artists.join(" ").toLowerCase().includes(f));
+  return tracks.filter(
+    (tr) => (tr.title ?? "").toLowerCase().includes(f) || (tr.artists ?? []).join(" ").toLowerCase().includes(f),
+  );
 }
 
 export function Hero({
@@ -77,7 +79,12 @@ export function Hero({
             {t("shuffle")}
           </button>
         )}
-        {extra}
+        {extra && (
+          <>
+            <div className="spacer" />
+            {extra}
+          </>
+        )}
       </div>
     </div>
   );

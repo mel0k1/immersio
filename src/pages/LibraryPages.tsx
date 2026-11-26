@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Download, Trash2 } from "lucide-react";
 import { open } from "@tauri-apps/plugin-dialog";
-import { playableOf, type TrackItem } from "../types";
+import { bestThumb, playableOf, type TrackItem } from "../types";
 import { useLibrary, usePlayer, useUi } from "../lib/store";
 import { useT } from "../lib/i18n";
 import { api } from "../lib/ipc";
@@ -21,11 +21,15 @@ export function LikedPage() {
   const filtered = useMemo(() => {
     const f = q.toLowerCase().trim();
     if (!f) return liked;
-    return liked.filter((tr) => tr.title.toLowerCase().includes(f) || tr.artists.join(" ").toLowerCase().includes(f));
+    return liked.filter(
+      (tr) => (tr.title ?? "").toLowerCase().includes(f) || (tr.artists ?? []).join(" ").toLowerCase().includes(f),
+    );
   }, [liked, q]);
 
   const total = liked.reduce((a, b) => a + (b.durationSecs ?? 0), 0);
   const playable = filtered.map(playableOf);
+  // hero art: first liked track that actually carries a thumbnail
+  const heroCover = bestThumb(liked.find((tr) => bestThumb(tr.thumbs))?.thumbs);
 
   const downloadAll = async () => {
     const dir = await open({ directory: true });
@@ -53,7 +57,7 @@ export function LikedPage() {
       <Hero
         kind={t("playlists")}
         title={t("likedSongs")}
-        cover={null}
+        cover={heroCover}
         round={false}
         meta={
           <>
@@ -97,7 +101,9 @@ export function MyPlaylistPage() {
   const filtered = useMemo(() => {
     const f = q.toLowerCase().trim();
     if (!f) return tracks;
-    return tracks.filter((tr) => tr.title.toLowerCase().includes(f) || tr.artists.join(" ").toLowerCase().includes(f));
+    return tracks.filter(
+      (tr) => (tr.title ?? "").toLowerCase().includes(f) || (tr.artists ?? []).join(" ").toLowerCase().includes(f),
+    );
   }, [tracks, q]);
   const playable = filtered.map(playableOf);
 
@@ -114,7 +120,7 @@ export function MyPlaylistPage() {
       <Hero
         kind={t("playlists")}
         title={playlist.name}
-        cover={tracks.length ? tracks[0].thumbs[tracks[0].thumbs.length - 1]?.url ?? null : null}
+        cover={bestThumb(tracks.find((tr) => bestThumb(tr.thumbs))?.thumbs)}
         meta={
           <>
             <span className="hero-chip">

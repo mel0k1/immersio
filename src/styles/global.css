@@ -244,6 +244,18 @@ img {
   margin-bottom: 4px;
 }
 
+/* Liner-style display header on Home ("My Wave") */
+.home-hero {
+  margin: -6px 0 10px;
+}
+.home-hero-title {
+  font-size: clamp(38px, 5.5vw, 64px);
+  font-weight: 750;
+  letter-spacing: -0.035em;
+  line-height: 1.02;
+  margin: 0;
+}
+
 .page-sub {
   color: var(--text-dim);
   margin-bottom: 20px;
@@ -256,9 +268,9 @@ img {
   margin: 26px 0 14px;
 }
 .section-title {
-  font-size: 18px;
-  font-weight: 590;
-  letter-spacing: -0.01em;
+  font-size: 22px;
+  font-weight: 650;
+  letter-spacing: -0.02em;
 }
 
 .pills {
@@ -267,11 +279,11 @@ img {
   flex-wrap: wrap;
 }
 .pill {
-  padding: 7px 16px;
+  padding: 8px 18px;
   border-radius: 999px;
   background: var(--surface);
   color: var(--text-dim);
-  font-size: 13px;
+  font-size: 13.5px;
   font-weight: 510;
   transition: background 0.15s, color 0.15s;
 }
@@ -370,8 +382,8 @@ img {
 
 .grid-cards {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
-  gap: 18px;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 20px;
 }
 .card {
   position: relative;
@@ -411,6 +423,14 @@ img {
   place-items: center;
   color: rgba(255, 255, 255, 0.75);
 }
+.cover-ph svg {
+  width: 46px;
+  height: 46px;
+}
+.hero-top .cover-ph svg {
+  width: 72px;
+  height: 72px;
+}
 .card-play {
   position: absolute;
   right: 10px;
@@ -433,8 +453,8 @@ img {
 }
 .card-title {
   margin-top: 10px;
-  font-weight: 510;
-  font-size: 14px;
+  font-weight: 590;
+  font-size: 15px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -442,7 +462,7 @@ img {
 .card-sub {
   color: var(--text-dim);
   font-size: 13px;
-  margin-top: 2px;
+  margin-top: 3px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -454,7 +474,8 @@ img {
   padding: 3px 9px;
   border-radius: 999px;
   background: rgba(0, 0, 0, 0.65);
-  backdrop-filter: blur(8px);
+  backdrop-filter: var(--panel-blur);
+  -webkit-backdrop-filter: var(--panel-blur);
   font-size: 11px;
   font-weight: 650;
   color: var(--text);
@@ -619,7 +640,8 @@ img {
   position: absolute;
   inset: 0;
   background: rgba(10, 10, 10, 0.35);
-  backdrop-filter: blur(28px);
+  backdrop-filter: var(--panel-blur);
+  -webkit-backdrop-filter: var(--panel-blur);
   z-index: -1;
   border-radius: inherit;
 }
@@ -675,7 +697,8 @@ img {
   padding: 4px 12px;
   border-radius: 999px;
   background: var(--surface-3);
-  backdrop-filter: blur(10px);
+  backdrop-filter: var(--panel-blur);
+  -webkit-backdrop-filter: var(--panel-blur);
   color: var(--text);
   font-size: 12px;
   font-weight: 510;
@@ -692,10 +715,14 @@ img {
 }
 .hero-actions .btn {
   background: var(--surface-3);
-  backdrop-filter: blur(10px);
+  backdrop-filter: var(--panel-blur);
+  -webkit-backdrop-filter: var(--panel-blur);
 }
 .hero-actions .btn:hover {
   background: rgba(255, 255, 255, 0.22);
+}
+.hero-actions .spacer {
+  flex: 1;
 }
 .hero-actions .btn.primary {
   background: var(--btn-primary-bg);
@@ -1158,8 +1185,8 @@ img {
 /* Liner glass pill: dark gradient tint + blur, no border */
 .fs-chip {
   background: linear-gradient(135deg, rgba(0, 0, 0, 0.45) 0%, rgba(0, 0, 0, 0.35) 100%);
-  backdrop-filter: blur(20px) saturate(160%);
-  -webkit-backdrop-filter: blur(20px) saturate(160%);
+  backdrop-filter: var(--panel-blur);
+  -webkit-backdrop-filter: var(--panel-blur);
   border: none;
 }
 .fs-chip button {
@@ -1178,7 +1205,8 @@ img {
   position: fixed;
   inset: 0;
   background: rgba(0, 0, 0, 0.55);
-  backdrop-filter: blur(6px);
+  backdrop-filter: var(--panel-blur);
+  -webkit-backdrop-filter: var(--panel-blur);
   z-index: 90;
   display: grid;
   place-items: center;
@@ -1428,14 +1456,19 @@ img {
 
 .row-of-cards {
   display: flex;
-  gap: 14px;
+  gap: 16px;
   overflow-x: auto;
   scroll-behavior: smooth;
   padding-bottom: 6px;
+  /* Liner keeps horizontal shelves clean: no scrollbar chrome */
+  scrollbar-width: none;
+}
+.row-of-cards::-webkit-scrollbar {
+  display: none;
 }
 .row-of-cards .card {
-  min-width: 168px;
-  width: 168px;
+  min-width: 196px;
+  width: 196px;
 }
 
 .empty-cover {
@@ -1484,7 +1517,8 @@ img {
   padding: 10px 12px;
   box-sizing: border-box;
   background: rgba(18, 18, 22, 0.94);
-  backdrop-filter: blur(24px);
+  backdrop-filter: var(--panel-blur);
+  -webkit-backdrop-filter: var(--panel-blur);
   border-radius: 14px;
   border: 1px solid var(--surface-2);
   user-select: none;

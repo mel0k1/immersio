@@ -136,12 +136,12 @@ export interface ImportResult {
 export const playableOf = (t: TrackItem): Playable => ({
   key: t.videoId,
   videoId: t.videoId,
-  title: t.title,
-  artists: t.artists,
-  album: t.album,
+  title: t.title ?? "",
+  artists: t.artists ?? [],
+  album: t.album ?? null,
   durationSecs: t.durationSecs,
   thumb: bestThumb(t.thumbs),
-  explicit: t.explicit,
+  explicit: !!t.explicit,
 });
 
 export const playableLocal = (t: LocalTrack): Playable => ({

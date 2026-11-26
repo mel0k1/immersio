@@ -179,6 +179,14 @@ const ru: Dict = {
   scLike: "Лайк",
   scQueue: "Очередь",
   scSearch: "Поиск",
+  myWave: "Моя волна",
+  goodMorning: "Доброе утро",
+  goodAfternoon: "Добрый день",
+  goodEvening: "Добрый вечер",
+  goodNight: "Доброй ночи",
+  crashTitle: "Что-то сломалось на этой странице",
+  crashUnknown: "Неизвестная ошибка рендера",
+  crashReload: "Перезагрузить",
 };
 
 LOCALES.ru = ru;
@@ -356,6 +364,14 @@ const en: Dict = {
   scLike: "Like",
   scQueue: "Queue",
   scSearch: "Search",
+  myWave: "My Wave",
+  goodMorning: "Good morning",
+  goodAfternoon: "Good afternoon",
+  goodEvening: "Good evening",
+  goodNight: "Late night",
+  crashTitle: "Something broke on this page",
+  crashUnknown: "Unknown render error",
+  crashReload: "Reload",
 };
 
 LOCALES.en = en;

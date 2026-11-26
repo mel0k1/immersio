@@ -24,7 +24,10 @@ export function PlaylistModals() {
     return (
       <div className="modal-back" onClick={close}>
         <div className="modal" onClick={(e) => e.stopPropagation()}>
-          <div className="modal-title">{t("addToPlaylist")}</div>
+          <div className="modal-title">
+            {t("addToPlaylist")}
+            {addToPlaylist.length > 1 ? ` · ${addToPlaylist.length}` : ""}
+          </div>
           {playlists.length === 0 && <div className="state-block" style={{ padding: 20 }}>{t("emptyLibrary")}</div>}
           {playlists.map((p) => (
             <button
@@ -44,10 +47,7 @@ export function PlaylistModals() {
           <button
             className="btn"
             style={{ marginTop: 10, width: "100%", justifyContent: "center" }}
-            onClick={() => {
-              setCreateOpen(true);
-              openAddToPlaylist(null);
-            }}
+            onClick={() => setCreateOpen(true)}
           >
             <Plus size={16} />
             {t("createPlaylist")}
@@ -70,7 +70,8 @@ export function PlaylistModals() {
           onChange={(e) => setName(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === "Enter" && name.trim()) {
-              createPlaylist(name.trim());
+              const p = createPlaylist(name.trim());
+              if (addToPlaylist) addTracks(p.id, addToPlaylist);
               showToast(t("createPlaylist"));
               close();
             }
@@ -84,7 +85,9 @@ export function PlaylistModals() {
             className="btn primary"
             disabled={!name.trim()}
             onClick={() => {
-              createPlaylist(name.trim());
+              const p = createPlaylist(name.trim());
+              // if the create dialog was opened from "add to playlist", drop the pending tracks in
+              if (addToPlaylist) addTracks(p.id, addToPlaylist);
               showToast(t("createPlaylist"));
               close();
             }}
