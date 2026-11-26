@@ -3,11 +3,11 @@ import type { ReactNode } from "react";
 import { Cover } from "./Cover";
 import type { ItemKind } from "../types";
 
-export function Section({ title, action, children }: { title: string; action?: ReactNode; children: ReactNode }) {
+export function Section({ title, action, xl, children }: { title: string; action?: ReactNode; xl?: boolean; children: ReactNode }) {
   return (
     <section>
       <div className="section-head">
-        <h2 className="section-title">{title}</h2>
+        <h2 className={`section-title${xl ? " section-title-xl" : ""}`}>{title}</h2>
         {action}
       </div>
       {children}

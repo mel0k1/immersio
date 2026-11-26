@@ -1,5 +1,5 @@
 /** Deterministic pixel-art covers for daily mixes: dithered field + our ghost mascot.
- *  Deliberately distinct from Liner's halftone covers — the ghost silhouette is ours. */
+ *  Even mixes wear headphones. Deliberately distinct from Liner's halftone covers. */
 
 function mulberry32(seed: number) {
   return function () {
@@ -32,6 +32,21 @@ const GHOST = [
   "########",
   "#.#.#.#.",
 ];
+
+// headphones for even mixes: band over the head + accent cups on the sides
+function headphones(ox: number, oy: number, accent: string): string[] {
+  const parts: string[] = [];
+  const px = (x: number, y: number, w: number, h: number, fill: string) =>
+    parts.push(`<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${fill}"/>`);
+  px(ox, oy - 1, 8, 1, accent);
+  px(ox, oy, 1, 1, accent);
+  px(ox + 7, oy, 1, 1, accent);
+  px(ox - 1, oy + 1, 2, 3, accent);
+  px(ox + 7, oy + 1, 2, 3, accent);
+  px(ox, oy + 2, 1, 2, "#101014");
+  px(ox + 7, oy + 2, 1, 2, "#101014");
+  return parts;
+}
 
 export function mixArt(seed: number): string {
   const rnd = mulberry32(seed * 2654435761 + 11);
@@ -69,6 +84,7 @@ export function mixArt(seed: number): string {
     `<rect x="${ox}" y="${oy + 1}" width="8" height="8" fill="${b}" opacity="0.8"/>` +
     body.join("") +
     eyes.join("") +
+    (seed % 2 === 0 ? headphones(ox, oy, a).join("") : "") +
     `</svg>`;
   return `data:image/svg+xml,${encodeURIComponent(svg)}`;
 }

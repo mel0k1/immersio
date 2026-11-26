@@ -52,7 +52,7 @@ export function PlayerBar() {
       <div className="pb-left">
         {track ? (
           <>
-            <div onClick={() => setFullscreen(true)} style={{ cursor: "pointer", width: 48, height: 48, borderRadius: 10 }}>
+            <div onClick={() => setFullscreen(true)} style={{ cursor: "pointer", width: 40, height: 40, borderRadius: 8 }}>
               <Cover src={track.thumb ?? track.coverPath ?? undefined} />
             </div>
             <div className="pb-titles" onClick={() => setFullscreen(true)}>
@@ -73,7 +73,7 @@ export function PlayerBar() {
             <SkipBack size={19} fill="currentColor" />
           </button>
           <button className="play-fab" onClick={toggle} disabled={!track}>
-            {loading ? <span className="spin" style={{ width: 16, height: 16, borderTopColor: "#0d0d10", borderColor: "rgba(13,13,16,.3)" }} /> : playing ? <Pause size={19} fill="currentColor" /> : <Play size={19} fill="currentColor" style={{ marginLeft: 2 }} />}
+            {loading ? <span className="spin" style={{ width: 14, height: 14, borderTopColor: "#0d0d10", borderColor: "rgba(13,13,16,.3)" }} /> : playing ? <Pause size={17} fill="currentColor" /> : <Play size={17} fill="currentColor" style={{ marginLeft: 2 }} />}
           </button>
           <button className="icon-btn" onClick={next} title="next">
             <SkipForward size={19} fill="currentColor" />

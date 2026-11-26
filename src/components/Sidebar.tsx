@@ -5,8 +5,8 @@ import { useLibrary } from "../lib/store";
 import { bestThumb } from "../types";
 import { Cover } from "./Cover";
 
-/** Rail shortcuts: liked tile + covers of user playlists and saved collections,
- *  in the spirit of Liner's sidebar strip. */
+/** Rail: nav icons, hairline divider, then liked tile + covers of user
+ *  playlists and saved collections, like Liner's sidebar strip. */
 export function Sidebar() {
   const t = useT();
   const playlists = useLibrary((s) => s.playlists);
@@ -38,29 +38,28 @@ export function Sidebar() {
       <div className="side-logo">
         <img src="/ghost.png" alt="Immersio" />
       </div>
-      <NavLink to="/" className={({ isActive }) => `side-btn${isActive ? " active" : ""}`} title={t("home")}>
-        <Home size={21} />
-      </NavLink>
-      <NavLink to="/search" className={({ isActive }) => `side-btn${isActive ? " active" : ""}`} title={t("search")}>
-        <Search size={21} />
-      </NavLink>
-      <NavLink to="/library" className={({ isActive }) => `side-btn${isActive ? " active" : ""}`} title={t("library")}>
-        <LibraryBig size={21} />
-      </NavLink>
-      <NavLink to="/liked" className={({ isActive }) => `side-btn${isActive ? " active" : ""}`} title={t("liked")}>
-        <Heart size={21} />
-      </NavLink>
+      <nav className="side-nav">
+        <NavLink to="/" className={({ isActive }) => `side-btn${isActive ? " active" : ""}`} title={t("home")}>
+          <Home size={20} />
+        </NavLink>
+        <NavLink to="/search" className={({ isActive }) => `side-btn${isActive ? " active" : ""}`} title={t("search")}>
+          <Search size={20} />
+        </NavLink>
+        <NavLink to="/library" className={({ isActive }) => `side-btn${isActive ? " active" : ""}`} title={t("library")}>
+          <LibraryBig size={20} />
+        </NavLink>
+        <NavLink to="/settings" className={({ isActive }) => `side-btn${isActive ? " active" : ""}`} title={t("settings")}>
+          <Settings size={20} />
+        </NavLink>
+      </nav>
+      <div className="side-rule" />
       <div className="side-tiles">
         {tiles.map((tile) => (
-          <NavLink key={tile.key} to={tile.to} className="side-tile" title={tile.title}>
-            {tile.kind === "liked" ? <Heart size={22} fill="#fff" color="none" /> : <Cover src={tile.cover} kind={tile.kind} />}
+          <NavLink key={tile.key} to={tile.to} className={({ isActive }) => `side-tile${isActive ? " active" : ""}`} title={tile.title}>
+            {tile.kind === "liked" ? <Heart size={20} fill="#fff" color="none" /> : <Cover src={tile.cover} kind={tile.kind} />}
           </NavLink>
         ))}
       </div>
-      <div className="side-spacer" />
-      <NavLink to="/settings" className={({ isActive }) => `side-btn${isActive ? " active" : ""}`} title={t("settings")}>
-        <Settings size={21} />
-      </NavLink>
     </aside>
   );
 }

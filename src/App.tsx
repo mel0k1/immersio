@@ -292,8 +292,8 @@ function Shell() {
           </ErrorBoundary>
         </div>
         {queueOpen && <QueueDrawer />}
-        <PlayerBar />
       </div>
+      <PlayerBar />
       <ErrorBoundary compact>
         <Fullscreen />
       </ErrorBoundary>

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Play } from "lucide-react";
+import { Play, Shuffle } from "lucide-react";
 import { api } from "../lib/ipc";
 import { playableOf, type Playable, type TrackItem } from "../types";
 import { useLibrary, usePlayer } from "../lib/store";
@@ -26,6 +26,8 @@ export function HomePage() {
   const liked = useLibrary((s) => s.liked);
   const saved = useLibrary((s) => s.saved);
   const playContext = usePlayer((s) => s.playContext);
+  const shuffle = usePlayer((s) => s.shuffle);
+  const toggleShuffle = usePlayer((s) => s.toggleShuffle);
   const [popular, setPopular] = useState<TrackItem[]>([]);
   const [popularFail, setPopularFail] = useState(false);
 
@@ -91,6 +93,9 @@ export function HomePage() {
             <Play size={17} fill="currentColor" />
             {t("playAll")}
           </button>
+          <button className={`btn${shuffle ? " primary" : ""}`} onClick={toggleShuffle} title={t("shuffle")} style={shuffle ? undefined : { width: 42, justifyContent: "center", paddingInline: 0 }}>
+            <Shuffle size={17} />
+          </button>
         </div>
       </div>
       {history.length > 0 && (
@@ -114,7 +119,7 @@ export function HomePage() {
         </Section>
       )}
       {mixes.length > 0 && (
-        <Section title={t("dailyMixes")}>
+        <Section title={t("dailyMixes")} xl>
           <div className="row-of-cards">
             {mixes.map((mix, i) => (
               <CollectionCard
